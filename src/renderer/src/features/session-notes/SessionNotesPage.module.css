@@ -99,7 +99,37 @@
 
 .card {
   background: var(--color-surface);
-  border-top: 3px solid var(--color-accent);
+  border-top: 3px solid var(--color-border);
+  transition: border-color var(--duration-fast) var(--easing);
+}
+
+.cardOpen {
+  border-top-color: var(--color-accent);
+}
+
+.cardToggle {
+  display: grid;
+  flex: none;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  margin: 2px calc(var(--space-2) * -1) 0 calc(var(--space-2) * -1);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+}
+
+.cardToggle:hover {
+  color: var(--color-accent-text);
+}
+
+.chevron {
+  transition: transform var(--duration-fast) var(--easing);
+}
+
+.chevronCollapsed {
+  transform: rotate(-90deg);
 }
 
 .cardHeader {

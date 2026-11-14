@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import type { Character } from '@shared/domain/characters';
 import type { Folder } from '@shared/domain/schema';
@@ -8,6 +8,7 @@ import { IconButton } from '@renderer/components/Button';
 import { EmptyState } from '@renderer/components/EmptyState';
 import { Icon } from '@renderer/components/Icon';
 import { Markdown } from '@renderer/components/Markdown';
+import { cx } from '@renderer/lib/cx';
 import { formatDateTime } from '@renderer/lib/dates';
 import { folderLabel, portraitUrl } from '@renderer/features/characters/characters';
 import { EmailSummaryButton } from '@renderer/features/email/EmailSummaryButton';
@@ -111,10 +112,24 @@ function SessionCard({ entry, showFolder }: { entry: SessionEntry; showFolder: b
   const { session, video, folder, notes, summary } = entry;
   const isPending = summary?.status === 'pending';
   const hasText = summary !== undefined && summary.markdown !== '';
+  // Cards start folded so the page reads as a list of sessions; open the one you want.
+  const [isOpen, setIsOpen] = useState(false);
+  const bodyId = useId();
 
   return (
-    <article className={styles.card}>
+    <article className={cx(styles.card, isOpen && styles.cardOpen)}>
       <header className={styles.cardHeader}>
+        <button
+          type="button"
+          className={styles.cardToggle}
+          aria-expanded={isOpen}
+          aria-controls={bodyId}
+          aria-label={`${isOpen ? 'Hide' : 'Show'} session notes for ${video.title}`}
+          title={isOpen ? 'Collapse' : 'Expand'}
+          onClick={() => setIsOpen((open) => !open)}
+        >
+          <Icon name="chevronDown" size={20} className={cx(styles.chevron, !isOpen && styles.chevronCollapsed)} />
+        </button>
         <div className={styles.cardTitle}>
           <h3>
             <Link to={routes.review(video.id)}>{video.title}</Link>
@@ -143,34 +158,36 @@ function SessionCard({ entry, showFolder }: { entry: SessionEntry; showFolder: b
         </div>
       </header>
 
-      {isPending && (
-        <p className={styles.pending} role="status">
-          <span className={styles.pulse} aria-hidden="true" />
-          {hasText
-            ? 'A new summary is being written in the terminal window. This is the previous one.'
-            : 'GitHub Copilot is writing this summary in the terminal window. It will appear here when it is saved.'}
-        </p>
-      )}
+      <div id={bodyId} hidden={!isOpen}>
+        {isPending && (
+          <p className={styles.pending} role="status">
+            <span className={styles.pulse} aria-hidden="true" />
+            {hasText
+              ? 'A new summary is being written in the terminal window. This is the previous one.'
+              : 'GitHub Copilot is writing this summary in the terminal window. It will appear here when it is saved.'}
+          </p>
+        )}
 
-      {hasText ? (
-        <div className={styles.summary}>
-          <Markdown>{summary.markdown}</Markdown>
-        </div>
-      ) : (
-        !isPending && <p className={styles.unsummarized}>Not summarized yet.</p>
-      )}
+        {hasText ? (
+          <div className={styles.summary}>
+            <Markdown>{summary.markdown}</Markdown>
+          </div>
+        ) : (
+          !isPending && <p className={styles.unsummarized}>Not summarized yet.</p>
+        )}
 
-      <details className={styles.notes}>
-        <summary>Your notes ({notes.length})</summary>
-        <ul>
-          {notes.map((note) => (
-            <li key={note.id}>
-              <span className={styles.noteTime}>{formatDuration(note.timeSeconds)}</span>
-              <span className={styles.noteBody}>{note.body}</span>
-            </li>
-          ))}
-        </ul>
-      </details>
+        <details className={styles.notes}>
+          <summary>Your notes ({notes.length})</summary>
+          <ul>
+            {notes.map((note) => (
+              <li key={note.id}>
+                <span className={styles.noteTime}>{formatDuration(note.timeSeconds)}</span>
+                <span className={styles.noteBody}>{note.body}</span>
+              </li>
+            ))}
+          </ul>
+        </details>
+      </div>
     </article>
   );
 }
