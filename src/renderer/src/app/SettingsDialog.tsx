@@ -9,6 +9,7 @@ import {
 import type { ThemePreference } from '@shared/domain/schema';
 import { Button } from '@renderer/components/Button';
 import { Dialog } from '@renderer/components/Dialog';
+import { EmailSetupDialog } from '@renderer/features/email/EmailSetupDialog';
 import { useLibrary } from '@renderer/store/hooks';
 import { useLibraryStore } from '@renderer/store/libraryStore';
 import { reportError } from '@renderer/store/toastStore';
@@ -31,6 +32,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const chooseVideosRoot = useLibraryStore((state) => state.chooseVideosRoot);
   const [staleDraft, setStaleDraft] = useState(String(settings.staleAfterDays));
   const [modelDraft, setModelDraft] = useState(settings.summaryModel);
+  const [isSettingUpEmail, setIsSettingUpEmail] = useState(false);
 
   const commitStaleAfterDays = (): void => {
     const days = Math.round(Number(staleDraft));
@@ -137,6 +139,23 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
         </div>
 
         <div className={styles.field}>
+          <span className={styles.label}>Email</span>
+          <div className={styles.inline}>
+            <code title={settings.email?.to}>
+              {settings.email ? `Summaries go to ${settings.email.to}` : 'Not set up'}
+            </code>
+            <Button icon="mail" onClick={() => setIsSettingUpEmail(true)}>
+              {settings.email ? 'Edit' : 'Set up'}
+            </Button>
+          </div>
+          <p>
+            {settings.email?.autoSend
+              ? 'Each summary is emailed automatically as soon as it is written.'
+              : 'Send a summary, your notes and its study videos to your phone from Session notes.'}
+          </p>
+        </div>
+
+        <div className={styles.field}>
           <span className={styles.label}>Videos folder</span>
           <div className={styles.inline}>
             <code title={settings.videosRoot ?? undefined}>{settings.videosRoot ?? 'Your system Videos folder'}</code>
@@ -147,6 +166,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
           <p>Where &ldquo;Add video&rdquo; looks for recordings. Videos already in your library are not affected.</p>
         </div>
       </div>
+      {isSettingUpEmail && <EmailSetupDialog onClose={() => setIsSettingUpEmail(false)} />}
     </Dialog>
   );
 }

@@ -10,6 +10,7 @@ import { Icon } from '@renderer/components/Icon';
 import { Markdown } from '@renderer/components/Markdown';
 import { formatDateTime } from '@renderer/lib/dates';
 import { folderLabel, portraitUrl } from '@renderer/features/characters/characters';
+import { EmailSummaryButton } from '@renderer/features/email/EmailSummaryButton';
 import { useLibrary } from '@renderer/store/hooks';
 import { useLibraryStore } from '@renderer/store/libraryStore';
 import { selectFolder, selectSessionGroups, type SessionEntry, type SessionGroup } from '@renderer/store/selectors';
@@ -130,6 +131,7 @@ function SessionCard({ entry, showFolder }: { entry: SessionEntry; showFolder: b
           </p>
         </div>
         <div className={styles.cardActions}>
+          {summary && <EmailSummaryButton summary={summary} />}
           <SummarizeButton sessionId={session.id} summary={summary} variant={summary ? 'secondary' : 'primary'} />
           {summary && (
             <IconButton

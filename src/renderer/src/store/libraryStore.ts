@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { Library, Note, SessionSummary, Timestamp, Video } from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { errorMessage, invoke } from '@renderer/lib/api';
+import { useToastStore } from './toastStore';
 
 /**
  * The renderer's copy of the library. The main process owns the data: every action asks
@@ -39,6 +40,11 @@ interface LibraryState {
   requestSummary: (sessionId: string) => Promise<SessionSummary>;
   /** Cancels a pending summary or deletes a finished one. */
   removeSummary: (id: string) => Promise<void>;
+
+  configureEmail: (request: IpcRequest<'email:configure'>) => Promise<void>;
+  removeEmail: () => Promise<void>;
+  sendTestEmail: () => Promise<{ sentTo: string }>;
+  sendSummaryEmail: (summaryId: string) => Promise<{ sentTo: string }>;
 }
 
 let isSubscribedToPushes = false;
@@ -55,6 +61,8 @@ export const useLibraryStore = create<LibraryState>((set) => {
       if (!isSubscribedToPushes) {
         // Changes that did not start in this window, such as the agent saving a summary.
         window.vodReviewer.onLibraryChanged(replace);
+        // Outcomes of background work, such as a summary being emailed automatically.
+        window.vodReviewer.onNotice(({ kind, message }) => useToastStore.getState().push(kind, message));
         isSubscribedToPushes = true;
       }
       try {
@@ -107,5 +115,10 @@ export const useLibraryStore = create<LibraryState>((set) => {
       return summary;
     },
     removeSummary: async (id) => replace(await invoke('summaries:remove', { id })),
+
+    configureEmail: async (request) => replace(await invoke('email:configure', request)),
+    removeEmail: async () => replace(await invoke('email:remove')),
+    sendTestEmail: () => invoke('email:sendTest'),
+    sendSummaryEmail: (summaryId) => invoke('email:sendSummary', { summaryId }),
   };
 });
