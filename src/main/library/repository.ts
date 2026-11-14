@@ -52,6 +52,12 @@ const MIGRATIONS: Record<number, (library: RawLibrary) => RawLibrary> = {
     },
     summaries: [],
   }),
+  // 3: the email account summaries are sent with.
+  2: (library) => ({
+    ...library,
+    schemaVersion: 3,
+    settings: { ...(typeof library.settings === 'object' ? library.settings : {}), email: null },
+  }),
 };
 
 function isRawLibrary(raw: unknown): raw is RawLibrary {

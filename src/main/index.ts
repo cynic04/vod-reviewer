@@ -1,10 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { app, BrowserWindow, dialog, shell } from 'electron';
-import { LIBRARY_CHANGED_CHANNEL } from '@shared/ipc/transport';
+import type { Notice } from '@shared/ipc/contract';
+import { LIBRARY_CHANGED_CHANNEL, NOTICE_CHANNEL } from '@shared/ipc/transport';
 import { AgentHarness } from './agent/harness';
 import { assertAgentAvailable, openTerminal } from './agent/platform';
 import { searchYouTube } from './agent/youtube';
+import { EncryptedFileCredentialStore } from './email/credentials';
+import { createSmtpSender } from './email/mailer';
+import { resolvePortrait } from './email/portraits';
+import { EmailService } from './email/service';
 import { createIpcHandlers } from './ipc/handlers';
 import { registerIpcRouter } from './ipc/router';
 import { JsonLibraryRepository } from './library/repository';
@@ -17,6 +22,7 @@ import { createMainWindow, isAppUrl } from './window';
  *   VOD_REVIEWER_USER_DATA    where library.json is stored
  *   VOD_REVIEWER_VIDEOS_ROOT  default folder of the import browser
  *   VOD_REVIEWER_AGENT_DRY_RUN  prepare summarize runs without starting the Copilot CLI
+ *   VOD_REVIEWER_SMTP_ALLOW_INSECURE  allow a mail server without TLS (unpackaged builds only)
  */
 const userDataOverride = process.env.VOD_REVIEWER_USER_DATA;
 const isAgentDryRun = process.env.VOD_REVIEWER_AGENT_DRY_RUN === '1';
@@ -47,6 +53,19 @@ async function bootstrap(): Promise<void> {
 
   handleMediaRequests({ getLibrary: () => library.library, getVideosRoot });
 
+  const sendToWindows = (channel: string, payload: unknown): void => {
+    for (const window of BrowserWindow.getAllWindows()) window.webContents.send(channel, payload);
+  };
+  const notify = (notice: Notice): void => sendToWindows(NOTICE_CHANNEL, notice);
+
+  const email = new EmailService({
+    library,
+    credentials: new EncryptedFileCredentialStore(path.join(app.getPath('userData'), 'email-credentials.bin')),
+    // Tests send to a local server without TLS; the real app always requires TLS.
+    send: createSmtpSender({ allowInsecure: process.env.VOD_REVIEWER_SMTP_ALLOW_INSECURE === '1' && !app.isPackaged }),
+    resolvePortrait,
+  });
+
   const agent = new AgentHarness({
     library,
     workspaceDir: path.join(app.getPath('userData'), 'agent'),
@@ -55,14 +74,23 @@ async function bootstrap(): Promise<void> {
     assertAgentAvailable: isAgentDryRun ? () => Promise.resolve() : assertAgentAvailable,
     openTerminal: isAgentDryRun ? () => Promise.resolve() : openTerminal,
     searchYouTube,
-    onLibraryChanged: (snapshot) => {
-      for (const window of BrowserWindow.getAllWindows()) {
-        window.webContents.send(LIBRARY_CHANGED_CHANNEL, snapshot);
-      }
+    onLibraryChanged: (snapshot) => sendToWindows(LIBRARY_CHANGED_CHANNEL, snapshot),
+    // Nobody is waiting on this, so the outcome is reported to the window as a notice.
+    onSummarySaved: (summaryId) => {
+      if (!library.library.settings.email?.autoSend) return;
+      email.sendSummary(summaryId).then(
+        ({ sentTo }) => notify({ kind: 'info', message: `Summary emailed to ${sentTo}.` }),
+        (error: unknown) =>
+          notify({
+            kind: 'error',
+            message: `The summary was saved but could not be emailed. ${error instanceof Error ? error.message : ''}`.trim(),
+          }),
+      );
     },
   });
   await agent.start();
   app.on('will-quit', () => agent.stop());
+
 
   registerIpcRouter(
     createIpcHandlers({
@@ -78,6 +106,7 @@ async function bootstrap(): Promise<void> {
       },
       showItemInFolder: (filePath) => shell.showItemInFolder(filePath),
       agent,
+      email,
     }),
     (event) => event.senderFrame !== null && isAppUrl(event.senderFrame.url),
   );

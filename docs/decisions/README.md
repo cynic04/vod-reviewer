@@ -15,3 +15,4 @@ it costs. Add a new numbered file when a decision of similar weight is made or r
 | [0008](0008-review-sessions.md) | Group notes into implicit review sessions |
 | [0009](0009-packaging.md) | Package for Windows with electron-builder |
 | [0010](0010-summarize-agent.md) | Summarize sessions with the Copilot CLI behind an app-hosted MCP endpoint |
+| [0011](0011-email-summaries.md) | Email summaries over SMTP from the user's own account |

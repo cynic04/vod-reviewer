@@ -51,8 +51,8 @@ describe('JSON library persistence', () => {
 
     const loaded = await new JsonLibraryRepository(filePath).load();
     expect(loaded).toMatchObject({
-      schemaVersion: 2,
-      settings: { theme: 'dark', playerCharacterId: null, summaryModel: 'claude-haiku-4.5' },
+      schemaVersion: 3,
+      settings: { theme: 'dark', playerCharacterId: null, summaryModel: 'claude-haiku-4.5', email: null },
       summaries: [],
     });
     expect(loaded?.folders).toEqual(current.folders);

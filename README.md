@@ -37,6 +37,9 @@ interface wears the game's colours in light and dark mode.
   Copilot on a small model, in a terminal window you can watch.
 - **Session notes.** Every review session and its summary in one place, grouped by
   character, from the top bar or from any matchup.
+- **Summaries by email.** Send a summary to your inbox - formatted, with your notes and
+  tappable cards for every recommended video - so you can read it on your phone. Sent on
+  request or automatically as each summary is written.
 - **Slow motion**, 0.1x to 2x.
 - **Light and dark themes**, following the system by default.
 
@@ -109,6 +112,31 @@ npm start        # build and run the production build
 | `npm run fetch:characters` | Re-download the character portraits (after a roster change) |
 | `npm run make:icon -- <id>` | Regenerate the app icon from a character portrait (default `mll`, Millia Rage) |
 
+## Emailing summaries
+
+Summaries can be sent to your email so the action plan and the study videos are on your
+phone. Each email contains the summary, a card with a thumbnail for every YouTube video
+it links to, and your timestamped notes. Your own recording is not attached - those files
+are far too large for email.
+
+Set it up once under **Settings > Email > Set up** (or press **Email** on any session
+card):
+
+1. **Send summaries to** - where they should arrive.
+2. **Sending account** - the account that sends them; it can be the same address.
+3. **App password** - for Gmail, create one at
+   [myaccount.google.com/apppasswords](https://myaccount.google.com/apppasswords)
+   (2-Step Verification must be on). Your normal Google password will not work.
+4. Press **Save and send test** and check your inbox.
+
+After that, press **Email** on a session card under Session notes to send that summary.
+With **Email each summary automatically** ticked (the default), every new summary is also
+sent as soon as it is written.
+
+The password is stored encrypted by Windows in `%APPDATA%\vod-reviewer\email-credentials.bin`,
+separately from your library, and is only ever sent to the mail server over an encrypted
+connection. **Remove account** in the same dialog deletes it.
+
 ## Keyboard shortcuts
 
 | Keys | Action |
@@ -136,7 +164,7 @@ Everything the app knows is in one human-readable file:
 ```
 
 It holds your folders, the videos you added (by path), timestamps, notes, review sessions,
-session summaries and settings. The installed app and a development run share this one file. Back it up or
+session summaries and settings. The email password is not in it. The installed app and a development run share this one file. Back it up or
 sync it like any other file. Its structure, and how it maps
 onto database tables, is documented in [docs/data-model.md](docs/data-model.md).
 
@@ -153,8 +181,9 @@ src/
   main/         Electron main process: library file, IPC, video streaming
   preload/      the bridge between the two
   main/agent/   the summarize agent harness (MCP endpoint, tools, launcher)
+  main/email/   summary emails (HTML content, SMTP sender, encrypted password store)
   renderer/     the React app (features: library, import, focus, review, player,
-                annotations, session-notes)
+                annotations, session-notes, email)
 docs/           architecture, data model + ERD, design system, decision records
 scripts/        character art fetcher, icon generator, end-to-end smoke test
 build/          installer resources (the app icon)
@@ -176,6 +205,7 @@ resources/      files bundled into the main process (the window icon, the agent'
 - Frame stepping assumes a constant frame rate, which is what OBS and ShadowPlay record.
   Until a new video has played for a second or two, 60 fps is assumed.
 - The installer is Windows-only, unsigned, and has no auto-update.
+- Emailing needs a one-time account setup, and for Gmail an app password.
 - Session summaries need the GitHub Copilot CLI and spend AI credits. They are written by
   a small model: treat specific claims about moves and frame data as leads to verify.
 

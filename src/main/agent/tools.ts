@@ -20,6 +20,8 @@ export interface AgentToolDependencies {
   searchYouTube: (query: string, period: YouTubeSearchPeriod) => Promise<YouTubeVideo[]>;
   /** Called after the agent changed the library, so the UI can be told. */
   onLibraryChanged: (library: Library) => void;
+  /** Called once a summary has been saved, for follow-up work such as emailing it. */
+  onSummarySaved?: (summaryId: string) => void;
 }
 
 /**
@@ -70,6 +72,7 @@ export function createAgentTools(summaryId: string, deps: AgentToolDependencies)
           completeSummary(current, summaryId, markdown, deps.library.context),
         );
         deps.onLibraryChanged(library);
+        deps.onSummarySaved?.(summaryId);
         return 'Saved. The summary is now in VOD Reviewer under Session notes.';
       },
     }),

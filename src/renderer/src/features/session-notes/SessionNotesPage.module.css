@@ -104,13 +104,14 @@
 
 .cardHeader {
   display: flex;
+  flex-wrap: wrap;
   align-items: flex-start;
   gap: var(--space-4);
   padding: var(--space-4) var(--space-5);
 }
 
 .cardTitle {
-  flex: 1;
+  flex: 1 1 280px;
   min-width: 0;
 }
 

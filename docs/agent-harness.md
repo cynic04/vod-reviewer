@@ -73,6 +73,9 @@ sequenceDiagram
 6. The app stores the markdown, marks the summary ready and pushes the new library to the
    window, where it appears under **Session notes** without a refresh.
 
+7. If email is set up with automatic sending on, the app emails the summary at this point
+   and reports the outcome in the window. See [ADR 0011](decisions/0011-email-summaries.md).
+
 The terminal stays open afterwards so the run can be read; closing it is safe at any point.
 
 ## The tools the agent gets

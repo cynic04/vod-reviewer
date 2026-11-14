@@ -23,6 +23,8 @@ export interface AgentHarnessDependencies {
   searchYouTube: (query: string, period: YouTubeSearchPeriod) => Promise<YouTubeVideo[]>;
   /** Tells the UI about a change the agent made. */
   onLibraryChanged: (library: Library) => void;
+  /** Called once the agent has saved a summary. */
+  onSummarySaved?: (summaryId: string) => void;
 }
 
 /**
