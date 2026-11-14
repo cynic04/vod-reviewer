@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { LIBRARY_SCHEMA_VERSION, THEME_PREFERENCES } from './constants';
+import { LIBRARY_SCHEMA_VERSION, MAX_SUMMARY_LENGTH, SUMMARY_MODEL_PATTERN, THEME_PREFERENCES } from './constants';
 
 /**
  * Single source of truth for the persisted data model.
@@ -7,7 +7,6 @@ import { LIBRARY_SCHEMA_VERSION, THEME_PREFERENCES } from './constants';
  * Every entity is a flat record that refers to its relations by id, which keeps
  * the JSON file a 1:1 image of the relational schema described in docs/data-model.md.
  */
-
 
 const idSchema = z.string().min(1);
 const isoDateSchema = z.iso.datetime();
@@ -20,6 +19,10 @@ export const settingsSchema = z.object({
   /** Absolute path of the folder the import browser opens in. `null` means the OS Videos folder. */
   videosRoot: z.string().min(1).nullable(),
   staleAfterDays: z.number().int().min(1).max(3650),
+  /** The character the user plays, so matchup advice can be specific. `null` if not set. */
+  playerCharacterId: z.string().min(1).nullable(),
+  /** GitHub Copilot model id the summarize agent runs on. */
+  summaryModel: z.string().regex(SUMMARY_MODEL_PATTERN),
 });
 
 export const folderKindSchema = z.enum(['matchup', 'custom']);
@@ -80,6 +83,22 @@ export const noteSchema = z.object({
   updatedAt: isoDateSchema,
 });
 
+export const summaryStatusSchema = z.enum(['pending', 'ready']);
+
+/** The AI-written coaching summary of one review session. At most one per session. */
+export const sessionSummarySchema = z.object({
+  id: idSchema,
+  sessionId: idSchema,
+  videoId: idSchema,
+  /** `pending` while the agent is working. A pending summary may still show the previous text. */
+  status: summaryStatusSchema,
+  /** Markdown written by the agent. Empty until the first run completes. */
+  markdown: z.string().max(MAX_SUMMARY_LENGTH),
+  model: z.string().min(1),
+  requestedAt: isoDateSchema,
+  completedAt: isoDateSchema.nullable(),
+});
+
 export const librarySchema = z.object({
   schemaVersion: z.literal(LIBRARY_SCHEMA_VERSION),
   settings: settingsSchema,
@@ -88,6 +107,7 @@ export const librarySchema = z.object({
   timestamps: z.array(timestampSchema),
   sessions: z.array(reviewSessionSchema),
   notes: z.array(noteSchema),
+  summaries: z.array(sessionSummarySchema),
 });
 
 export type ThemePreference = z.infer<typeof themePreferenceSchema>;
@@ -100,4 +120,6 @@ export type TimestampKind = z.infer<typeof timestampKindSchema>;
 export type Timestamp = z.infer<typeof timestampSchema>;
 export type ReviewSession = z.infer<typeof reviewSessionSchema>;
 export type Note = z.infer<typeof noteSchema>;
+export type SummaryStatus = z.infer<typeof summaryStatusSchema>;
+export type SessionSummary = z.infer<typeof sessionSummarySchema>;
 export type Library = z.infer<typeof librarySchema>;

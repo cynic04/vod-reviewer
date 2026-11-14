@@ -7,6 +7,7 @@ import {
   videoSchema,
   type Library,
   type Note,
+  type SessionSummary,
   type Timestamp,
   type Video,
 } from '../domain/schema';
@@ -27,7 +28,9 @@ const id = z.string().min(1);
 export const ipcRequestSchemas = {
   'library:get': z.undefined(),
 
-  'settings:update': settingsSchema.pick({ theme: true, staleAfterDays: true }).partial(),
+  'settings:update': settingsSchema
+    .pick({ theme: true, staleAfterDays: true, playerCharacterId: true, summaryModel: true })
+    .partial(),
   'settings:chooseVideosRoot': z.undefined(),
 
   'videos:browse': z.object({ directory: z.string().min(1).nullable() }),
@@ -61,6 +64,10 @@ export const ipcRequestSchemas = {
   }),
   'notes:update': noteSchema.pick({ id: true, body: true }),
   'notes:remove': z.object({ id }),
+
+  /** Starts the summarize agent for a review session, in a new terminal window. */
+  'summaries:request': z.object({ sessionId: id }),
+  'summaries:remove': z.object({ id }),
 } as const;
 
 export type IpcChannel = keyof typeof ipcRequestSchemas;
@@ -109,6 +116,8 @@ interface IpcResponses {
   'notes:create': { library: Library; note: Note };
   'notes:update': Library;
   'notes:remove': Library;
+  'summaries:request': { library: Library; summary: SessionSummary };
+  'summaries:remove': Library;
 }
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof ipcRequestSchemas)[C]>;
@@ -118,7 +127,7 @@ export type IpcResponse<C extends IpcChannel> = IpcResponses[C];
  * Errors cross the process boundary as data rather than as rejected promises, because
  * Electron strips everything but the message from errors thrown inside `ipcMain.handle`.
  */
-export type IpcErrorCode = 'INVALID_REQUEST' | 'NOT_FOUND' | 'CONFLICT' | 'FORBIDDEN' | 'INTERNAL';
+export type IpcErrorCode = 'INVALID_REQUEST' | 'NOT_FOUND' | 'CONFLICT' | 'FORBIDDEN' | 'UNAVAILABLE' | 'INTERNAL';
 
 export type IpcResult<T> = { ok: true; value: T } | { ok: false; error: { code: IpcErrorCode; message: string } };
 
@@ -128,4 +137,10 @@ export interface VodReviewerApi {
     channel: C,
     ...args: IpcRequest<C> extends undefined ? [] : [request: IpcRequest<C>]
   ): Promise<IpcResult<IpcResponse<C>>>;
+
+  /**
+   * Called when the library changes for a reason other than a request from this window -
+   * today, when the summarize agent hands in a summary. Returns the unsubscribe function.
+   */
+  onLibraryChanged(listener: (library: Library) => void): () => void;
 }

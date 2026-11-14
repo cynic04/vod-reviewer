@@ -1,6 +1,21 @@
-import { CHARACTERS, matchupFolderId } from '@shared/domain/characters';
-import { DEFAULT_FRAME_RATE, DEFAULT_STALE_AFTER_DAYS, LIBRARY_SCHEMA_VERSION } from '@shared/domain/constants';
-import type { Folder, Library, Note, ReviewSession, Settings, Timestamp, Video } from '@shared/domain/schema';
+import { CHARACTERS, getCharacter, matchupFolderId } from '@shared/domain/characters';
+import {
+  DEFAULT_FRAME_RATE,
+  DEFAULT_STALE_AFTER_DAYS,
+  DEFAULT_SUMMARY_MODEL,
+  LIBRARY_SCHEMA_VERSION,
+  MAX_SUMMARY_LENGTH,
+} from '@shared/domain/constants';
+import type {
+  Folder,
+  Library,
+  Note,
+  ReviewSession,
+  SessionSummary,
+  Settings,
+  Timestamp,
+  Video,
+} from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { pathKey } from '../videos/paths';
 import { DomainError, notFound } from './errors';
@@ -44,12 +59,19 @@ export function createEmptyLibrary(ctx: OperationContext): Library {
   const createdAt = ctx.now().toISOString();
   return {
     schemaVersion: LIBRARY_SCHEMA_VERSION,
-    settings: { theme: 'system', videosRoot: null, staleAfterDays: DEFAULT_STALE_AFTER_DAYS },
+    settings: {
+      theme: 'system',
+      videosRoot: null,
+      staleAfterDays: DEFAULT_STALE_AFTER_DAYS,
+      playerCharacterId: null,
+      summaryModel: DEFAULT_SUMMARY_MODEL,
+    },
     folders: CHARACTERS.map((character) => matchupFolder(character.id, character.name, createdAt)),
     videos: [],
     timestamps: [],
     sessions: [],
     notes: [],
+    summaries: [],
   };
 }
 
@@ -70,6 +92,9 @@ export function updateSettings(
   library: Library,
   patch: { [K in keyof Settings]?: Settings[K] | undefined },
 ): Library {
+  if (patch.playerCharacterId != null && !getCharacter(patch.playerCharacterId)) {
+    throw new DomainError('INVALID_REQUEST', `"${patch.playerCharacterId}" is not a character in the roster.`);
+  }
   const settings: Settings = applyPatch(library.settings, patch);
   return { ...library, settings };
 }
@@ -125,6 +150,7 @@ export function removeVideo(library: Library, id: string): Library {
     timestamps: library.timestamps.filter((timestamp) => timestamp.videoId !== id),
     sessions: library.sessions.filter((session) => session.videoId !== id),
     notes: library.notes.filter((note) => note.videoId !== id),
+    summaries: library.summaries.filter((summary) => summary.videoId !== id),
   };
 }
 
@@ -233,14 +259,98 @@ export function updateNote(library: Library, id: string, body: string, ctx: Oper
   return { ...library, notes: replaceById(library.notes, updated) };
 }
 
-/** Removes a note, and its session too once that session has no notes left. */
+/** Removes a note, and its session (with any summary of it) once that session has no notes left. */
 export function removeNote(library: Library, id: string): Library {
   const note = requireById(library.notes, id, 'Note');
   const notes = library.notes.filter((candidate) => candidate.id !== id);
-  const sessionIsEmpty = !notes.some((candidate) => candidate.sessionId === note.sessionId);
+  if (notes.some((candidate) => candidate.sessionId === note.sessionId)) return { ...library, notes };
   return {
     ...library,
     notes,
-    sessions: sessionIsEmpty ? library.sessions.filter((s) => s.id !== note.sessionId) : library.sessions,
+    sessions: library.sessions.filter((session) => session.id !== note.sessionId),
+    summaries: library.summaries.filter((summary) => summary.sessionId !== note.sessionId),
   };
+}
+
+/**
+ * Opens a summary request for a session. A session has at most one summary: asking again
+ * replaces it with a new pending one that keeps showing the previous text until the
+ * agent hands in a new version.
+ */
+export function requestSummary(
+  library: Library,
+  sessionId: string,
+  ctx: OperationContext,
+): { library: Library; summary: SessionSummary } {
+  const session = requireById(library.sessions, sessionId, 'Review session');
+  if (!library.notes.some((note) => note.sessionId === sessionId)) {
+    throw new DomainError('CONFLICT', 'There are no notes in this session to summarize yet.');
+  }
+
+  const previous = library.summaries.find((candidate) => candidate.sessionId === sessionId);
+  const summary: SessionSummary = {
+    id: ctx.newId(),
+    sessionId,
+    videoId: session.videoId,
+    status: 'pending',
+    markdown: previous?.markdown ?? '',
+    model: library.settings.summaryModel,
+    requestedAt: ctx.now().toISOString(),
+    completedAt: previous?.completedAt ?? null,
+  };
+  return {
+    library: {
+      ...library,
+      summaries: [...library.summaries.filter((candidate) => candidate.sessionId !== sessionId), summary],
+    },
+    summary,
+  };
+}
+
+/** Stores the text the agent wrote for a pending summary. */
+export function completeSummary(library: Library, id: string, markdown: string, ctx: OperationContext): Library {
+  const summary = requireById(library.summaries, id, 'Summary');
+  if (summary.status !== 'pending') {
+    throw new DomainError('CONFLICT', 'This summary has already been saved.');
+  }
+  const text = markdown.trim();
+  if (text === '') throw new DomainError('INVALID_REQUEST', 'The summary is empty.');
+  if (text.length > MAX_SUMMARY_LENGTH) {
+    throw new DomainError('INVALID_REQUEST', `The summary is longer than ${MAX_SUMMARY_LENGTH} characters.`);
+  }
+  const completed: SessionSummary = {
+    ...summary,
+    status: 'ready',
+    markdown: text,
+    completedAt: ctx.now().toISOString(),
+  };
+  return { ...library, summaries: replaceById(library.summaries, completed) };
+}
+
+/** What is left of a pending summary whose run will not finish: its previous text, if it had any. */
+function withoutPendingRun(summary: SessionSummary): SessionSummary[] {
+  if (summary.status !== 'pending') return [summary];
+  return summary.markdown === '' ? [] : [{ ...summary, status: 'ready' }];
+}
+
+/**
+ * Removes a summary. Cancelling a pending one gives up on the run in progress and falls
+ * back to the text from before it, so regenerating never destroys a summary by accident.
+ */
+export function removeSummary(library: Library, id: string): Library {
+  const summary = requireById(library.summaries, id, 'Summary');
+  const replacement = summary.status === 'pending' ? withoutPendingRun(summary) : [];
+  return {
+    ...library,
+    summaries: library.summaries.flatMap((candidate) => (candidate.id === id ? replacement : [candidate])),
+  };
+}
+
+/**
+ * Settles summaries that were still pending when the app last closed. The agent run that
+ * would have completed them can no longer reach this process.
+ */
+export function settleInterruptedSummaries(library: Library): Library {
+  if (!library.summaries.some((summary) => summary.status === 'pending')) return library;
+  return { ...library, summaries: library.summaries.flatMap(withoutPendingRun) };
 }

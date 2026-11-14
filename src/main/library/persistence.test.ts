@@ -35,6 +35,38 @@ describe('JSON library persistence', () => {
     expect(await readdir(directory)).toEqual(['library.json']);
   });
 
+  it('upgrades a library written by the first version of the app', async () => {
+    const current = createEmptyLibrary(ctx);
+    // Exactly what version 0.1.0 wrote: no summaries, and three settings.
+    const v1 = {
+      schemaVersion: 1,
+      settings: { theme: 'dark', videosRoot: null, staleAfterDays: 15 },
+      folders: current.folders,
+      videos: [],
+      timestamps: [],
+      sessions: [],
+      notes: [],
+    };
+    await writeFile(filePath, JSON.stringify(v1), 'utf8');
+
+    const loaded = await new JsonLibraryRepository(filePath).load();
+    expect(loaded).toMatchObject({
+      schemaVersion: 2,
+      settings: { theme: 'dark', playerCharacterId: null, summaryModel: 'claude-haiku-4.5' },
+      summaries: [],
+    });
+    expect(loaded?.folders).toEqual(current.folders);
+  });
+
+  it('refuses a library from a newer version without touching it', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => undefined);
+    await writeFile(filePath, JSON.stringify({ ...createEmptyLibrary(ctx), schemaVersion: 99 }), 'utf8');
+
+    expect(await new JsonLibraryRepository(filePath).load()).toBeNull();
+    const [backup] = await readdir(directory);
+    expect(JSON.parse(await readFile(path.join(directory, backup ?? ''), 'utf8'))).toMatchObject({ schemaVersion: 99 });
+  });
+
   it('sets an unreadable file aside instead of overwriting it', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     await writeFile(filePath, '{ "schemaVersion": 1, "videos": "broken" }', 'utf8');
