@@ -82,21 +82,37 @@ function groupName(character: Character | null): string {
 function GroupSection({ group, showHeading }: { group: SessionGroup; showHeading: boolean }) {
   const portrait = portraitUrl(group.character?.id ?? null);
   const headingId = `group-${group.key}`;
+  const entriesId = `group-${group.key}-sessions`;
+  // Characters start folded, so the page opens as a list of matchups. A page that shows
+  // a single matchup has no heading to fold under and lists its sessions directly.
+  const [isOpen, setIsOpen] = useState(false);
+  const showEntries = !showHeading || isOpen;
 
   return (
     <section className={styles.group} aria-labelledby={showHeading ? headingId : undefined}>
       {showHeading && (
-        <header className={styles.groupHeader}>
-          <span className={styles.groupArt}>
-            {portrait ? <img src={portrait} alt="" /> : <Icon name="folder" size={22} />}
-          </span>
-          <h2 id={headingId}>{groupName(group.character)}</h2>
+        <header className={cx(styles.groupHeader, isOpen && styles.groupOpen)}>
+          <h2 id={headingId}>
+            <button
+              type="button"
+              className={styles.groupToggle}
+              aria-expanded={isOpen}
+              aria-controls={entriesId}
+              onClick={() => setIsOpen((open) => !open)}
+            >
+              <Icon name="chevronDown" size={22} className={cx(styles.chevron, !isOpen && styles.chevronCollapsed)} />
+              <span className={styles.groupArt}>
+                {portrait ? <img src={portrait} alt="" /> : <Icon name="folder" size={22} />}
+              </span>
+              <span>{groupName(group.character)}</span>
+            </button>
+          </h2>
           <span className={styles.groupCount}>
             {group.entries.length === 1 ? '1 session' : `${group.entries.length} sessions`}
           </span>
         </header>
       )}
-      <ol className={styles.entries}>
+      <ol className={styles.entries} id={entriesId} hidden={!showEntries}>
         {group.entries.map((entry) => (
           <li key={entry.session.id}>
             <SessionCard entry={entry} showFolder={group.character === null} />

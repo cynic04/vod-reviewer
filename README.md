@@ -36,8 +36,8 @@ interface wears the game's colours in light and dark mode.
   footage of the matchup and to guides for the skills that need work. Written by GitHub
   Copilot on a small model, in a terminal window you can watch.
 - **Session notes.** Every review session and its summary in one place, grouped by
-  character, from the top bar or from any matchup. Sessions are listed collapsed; open
-  the one you want to read.
+  character, from the top bar or from any matchup. Characters and the sessions under
+  them both start collapsed; open the ones you want to read.
 - **Summaries by email.** Send a summary to your inbox - formatted, with your notes and
   tappable cards for every recommended video - so you can read it on your phone. Sent on
   request or automatically as each summary is written.
