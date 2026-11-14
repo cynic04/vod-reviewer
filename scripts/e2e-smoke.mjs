@@ -309,6 +309,11 @@ async function main() {
     // The agent's save reaches the open window without any request from it.
     await page.getByRole('link', { name: 'View summary' }).click();
     await page.getByRole('heading', { name: 'Session notes', level: 1 }).waitFor();
+    // Session cards start collapsed: only the header shows until one is opened.
+    const sessionToggle = page.getByRole('button', { name: 'Show session notes for ranked-set' });
+    assert.equal(await sessionToggle.getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.getByRole('heading', { name: 'Overview' }).count(), 0, 'summary is hidden while collapsed');
+    await sessionToggle.click();
     await page.getByRole('heading', { name: 'Overview' }).waitFor();
     const studyLink = page.getByRole('link', { name: 'Combo guide' });
     assert.equal(await studyLink.getAttribute('target'), '_blank', 'links open outside the app');
