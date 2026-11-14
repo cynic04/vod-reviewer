@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { LIBRARY_SCHEMA_VERSION, THEME_PREFERENCES } from './constants';
 
 /**
  * Single source of truth for the persisted data model.
@@ -7,16 +8,12 @@ import { z } from 'zod';
  * the JSON file a 1:1 image of the relational schema described in docs/data-model.md.
  */
 
-export const LIBRARY_SCHEMA_VERSION = 1;
-
-export const DEFAULT_FRAME_RATE = 60;
-export const DEFAULT_STALE_AFTER_DAYS = 15;
 
 const idSchema = z.string().min(1);
 const isoDateSchema = z.iso.datetime();
-const timeSecondsSchema = z.number().finite().nonnegative();
+const timeSecondsSchema = z.number().nonnegative();
 
-export const themePreferenceSchema = z.enum(['system', 'light', 'dark']);
+export const themePreferenceSchema = z.enum(THEME_PREFERENCES);
 
 export const settingsSchema = z.object({
   theme: themePreferenceSchema,
@@ -49,8 +46,8 @@ export const videoSchema = z.object({
   /** Last-modified time of the source file, i.e. when the recording finished. */
   recordedAt: isoDateSchema,
   importedAt: isoDateSchema,
-  durationSeconds: z.number().finite().positive().nullable(),
-  frameRate: z.number().finite().min(1).max(480),
+  durationSeconds: z.number().positive().nullable(),
+  frameRate: z.number().min(1).max(480),
   frameRateSource: frameRateSourceSchema,
 });
 
