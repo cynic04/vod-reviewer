@@ -87,24 +87,34 @@
   transition: transform var(--duration-fast) var(--easing);
 }
 
-/* Hovering lifts the card and brings the portrait forward; there is no frame. */
+/*
+ * The frame that fades in on hover. It is an overlay rather than an outline because an
+ * outline is painted beneath the card's positioned children (the caption) and would be
+ * hidden by them.
+ */
+.matchupCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-frame-fade) ease-out;
+}
+
 .matchupCard:hover,
 .matchupCard:focus-visible {
   outline: none;
   transform: translateY(-3px);
 }
 
-/*
- * Keyboard focus still needs a visible ring. It is an overlay rather than an outline
- * because an outline is painted beneath the card's positioned children (the caption)
- * and would be hidden by them.
- */
+.matchupCard:hover::after,
 .matchupCard:focus-visible::after {
-  content: '';
-  position: absolute;
-  inset: 0;
-  border: 3px solid var(--color-focus-ring);
-  pointer-events: none;
+  opacity: 1;
+}
+
+.matchupCard:focus-visible::after {
+  border-color: var(--color-focus-ring);
 }
 
 .portrait img {
