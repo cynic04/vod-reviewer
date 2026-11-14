@@ -84,17 +84,36 @@
   display: block;
   overflow: hidden;
   background: var(--ink-900);
-  outline: 3px solid transparent;
-  outline-offset: -3px;
-  transition:
-    transform var(--duration-fast) var(--easing),
-    outline-color var(--duration-fast) var(--easing);
+  transition: transform var(--duration-fast) var(--easing);
+}
+
+/*
+ * The hover frame is an overlay rather than an outline: an outline is painted beneath
+ * the card's positioned children (the caption) and would be hidden by them.
+ */
+.matchupCard::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border: 3px solid var(--color-accent);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--duration-fast) var(--easing);
 }
 
 .matchupCard:hover,
 .matchupCard:focus-visible {
-  outline-color: var(--color-accent);
+  outline: none;
   transform: translateY(-3px);
+}
+
+.matchupCard:hover::after,
+.matchupCard:focus-visible::after {
+  opacity: 1;
+}
+
+.matchupCard:focus-visible::after {
+  border-color: var(--color-focus-ring);
 }
 
 .portrait img {
@@ -133,12 +152,17 @@
 
 .caption {
   position: absolute;
-  inset: auto 0 0;
+  /*
+   * Overshoot the bottom edge by a pixel (the card clips it). Card heights are fractional
+   * and the hovered card is drawn on its own layer, so a caption that ends exactly at the
+   * edge can stop a device pixel short and leave a bright line of unshaded portrait.
+   */
+  inset: auto 0 -1px;
   display: grid;
   grid-template-columns: auto 1fr;
   align-items: baseline;
   column-gap: var(--space-2);
-  padding: var(--space-6) var(--space-3) var(--space-2);
+  padding: var(--space-6) var(--space-3) calc(var(--space-2) + 1px);
   background: linear-gradient(transparent, var(--portrait-fade) 62%);
   color: #fff;
 }
