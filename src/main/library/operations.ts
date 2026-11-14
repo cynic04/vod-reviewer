@@ -65,6 +65,7 @@ export function createEmptyLibrary(ctx: OperationContext): Library {
       staleAfterDays: DEFAULT_STALE_AFTER_DAYS,
       playerCharacterId: null,
       summaryModel: DEFAULT_SUMMARY_MODEL,
+      email: null,
     },
     folders: CHARACTERS.map((character) => matchupFolder(character.id, character.name, createdAt)),
     videos: [],

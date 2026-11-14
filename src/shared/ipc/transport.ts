@@ -9,3 +9,6 @@ export const IPC_INVOKE_CHANNEL = 'vod-reviewer:invoke';
 
 /** Main-to-renderer push carrying a fresh library snapshot. */
 export const LIBRARY_CHANGED_CHANNEL = 'vod-reviewer:library-changed';
+
+/** Main-to-renderer push carrying a Notice. */
+export const NOTICE_CHANNEL = 'vod-reviewer:notice';

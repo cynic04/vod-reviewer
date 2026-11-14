@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import {
+  emailSettingsSchema,
   folderSchema,
   noteSchema,
   settingsSchema,
@@ -68,6 +69,15 @@ export const ipcRequestSchemas = {
   /** Starts the summarize agent for a review session, in a new terminal window. */
   'summaries:request': z.object({ sessionId: id }),
   'summaries:remove': z.object({ id }),
+
+  /**
+   * Saves the email account. `password: null` keeps the stored one, which is only
+   * allowed once one has been stored.
+   */
+  'email:configure': emailSettingsSchema.extend({ password: z.string().min(1).max(256).nullable() }),
+  'email:remove': z.undefined(),
+  'email:sendTest': z.undefined(),
+  'email:sendSummary': z.object({ summaryId: id }),
 } as const;
 
 export type IpcChannel = keyof typeof ipcRequestSchemas;
@@ -118,6 +128,10 @@ interface IpcResponses {
   'notes:remove': Library;
   'summaries:request': { library: Library; summary: SessionSummary };
   'summaries:remove': Library;
+  'email:configure': Library;
+  'email:remove': Library;
+  'email:sendTest': { sentTo: string };
+  'email:sendSummary': { sentTo: string };
 }
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof ipcRequestSchemas)[C]>;
@@ -143,4 +157,16 @@ export interface VodReviewerApi {
    * today, when the summarize agent hands in a summary. Returns the unsubscribe function.
    */
   onLibraryChanged(listener: (library: Library) => void): () => void;
+
+  /**
+   * Called when something the user did not directly ask for has finished in the
+   * background, such as a summary being emailed automatically.
+   */
+  onNotice(listener: (notice: Notice) => void): () => void;
+}
+
+/** A short message from the main process, shown as a toast. */
+export interface Notice {
+  kind: 'info' | 'error';
+  message: string;
 }

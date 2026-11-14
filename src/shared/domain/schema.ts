@@ -14,6 +14,21 @@ const timeSecondsSchema = z.number().nonnegative();
 
 export const themePreferenceSchema = z.enum(THEME_PREFERENCES);
 
+/**
+ * Where summaries are emailed to and which account sends them. The account's password
+ * is deliberately not part of the library: it is kept encrypted in a separate file.
+ */
+export const emailSettingsSchema = z.object({
+  /** Address the summaries are sent to. */
+  to: z.email(),
+  /** Address of the sending account; also its SMTP user name. */
+  from: z.email(),
+  host: z.string().trim().min(1).max(253).regex(/^[A-Za-z0-9.-]+$/),
+  port: z.number().int().min(1).max(65535),
+  /** Email each summary as soon as the agent has written it, without being asked. */
+  autoSend: z.boolean(),
+});
+
 export const settingsSchema = z.object({
   theme: themePreferenceSchema,
   /** Absolute path of the folder the import browser opens in. `null` means the OS Videos folder. */
@@ -23,6 +38,8 @@ export const settingsSchema = z.object({
   playerCharacterId: z.string().min(1).nullable(),
   /** GitHub Copilot model id the summarize agent runs on. */
   summaryModel: z.string().regex(SUMMARY_MODEL_PATTERN),
+  /** `null` until email has been set up. */
+  email: emailSettingsSchema.nullable(),
 });
 
 export const folderKindSchema = z.enum(['matchup', 'custom']);
@@ -111,6 +128,7 @@ export const librarySchema = z.object({
 });
 
 export type ThemePreference = z.infer<typeof themePreferenceSchema>;
+export type EmailSettings = z.infer<typeof emailSettingsSchema>;
 export type Settings = z.infer<typeof settingsSchema>;
 export type FolderKind = z.infer<typeof folderKindSchema>;
 export type Folder = z.infer<typeof folderSchema>;
