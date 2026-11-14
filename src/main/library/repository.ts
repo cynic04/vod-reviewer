@@ -1,7 +1,8 @@
 import { randomUUID } from 'node:crypto';
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { LIBRARY_SCHEMA_VERSION, librarySchema, type Library } from '@shared/domain/schema';
+import { LIBRARY_SCHEMA_VERSION } from '@shared/domain/constants';
+import { librarySchema, type Library } from '@shared/domain/schema';
 
 export interface LibraryRepository {
   /** Resolves to `null` when nothing has been stored yet. */
@@ -11,6 +12,26 @@ export interface LibraryRepository {
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && 'code' in error;
+}
+
+const RENAME_RETRY_DELAYS_MS = [20, 50, 100, 200, 400];
+const TRANSIENT_RENAME_ERRORS = new Set(['EPERM', 'EBUSY', 'EACCES']);
+
+/**
+ * `rename` that tolerates the target being briefly held open by another process. On
+ * Windows, replacing a file fails while a virus scanner, indexer or backup tool reads it.
+ */
+async function renameWithRetry(from: string, to: string): Promise<void> {
+  for (const delay of RENAME_RETRY_DELAYS_MS) {
+    try {
+      await rename(from, to);
+      return;
+    } catch (error) {
+      if (!isNodeError(error) || !TRANSIENT_RENAME_ERRORS.has(error.code ?? '')) throw error;
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
+  }
+  await rename(from, to);
 }
 
 /**
@@ -59,7 +80,12 @@ export class JsonLibraryRepository implements LibraryRepository {
   async save(library: Library): Promise<void> {
     await mkdir(path.dirname(this.#filePath), { recursive: true });
     const temporaryPath = `${this.#filePath}.${randomUUID()}.tmp`;
-    await writeFile(temporaryPath, `${JSON.stringify(library, null, 2)}\n`, 'utf8');
-    await rename(temporaryPath, this.#filePath);
+    try {
+      await writeFile(temporaryPath, `${JSON.stringify(library, null, 2)}\n`, 'utf8');
+      await renameWithRetry(temporaryPath, this.#filePath);
+    } catch (error) {
+      await rm(temporaryPath, { force: true });
+      throw error;
+    }
   }
 }

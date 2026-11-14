@@ -15,7 +15,7 @@ function failure(code: IpcErrorCode, message: string): IpcResult<never> {
   return { ok: false, error: { code, message } };
 }
 
-async function dispatch(handlers: IpcHandlers, channel: IpcChannel, rawRequest: unknown): Promise<unknown> {
+function dispatch(handlers: IpcHandlers, channel: IpcChannel, rawRequest: unknown): unknown {
   const request: unknown = ipcRequestSchemas[channel].parse(rawRequest);
   // The schema for `channel` has just validated `request`, which TypeScript cannot follow
   // through the channel-indexed lookup - hence the single widening cast.

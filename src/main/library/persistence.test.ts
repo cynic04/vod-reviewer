@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, open, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import path from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +44,24 @@ describe('JSON library persistence', () => {
     const [backup] = await readdir(directory);
     expect(backup).toMatch(/^library\.unreadable-\d+\.json$/);
     expect(await readFile(path.join(directory, backup ?? ''), 'utf8')).toContain('"broken"');
+  });
+
+  it('saves even while another process briefly holds the file open', async () => {
+    // On Windows a file cannot be replaced while a scanner, indexer or sync tool has it open.
+    const repository = new JsonLibraryRepository(filePath);
+    await repository.save(createEmptyLibrary(ctx));
+    const updated = updateSettings(createEmptyLibrary(ctx), { theme: 'light' });
+
+    const handle = await open(filePath, 'r');
+    const released = new Promise<void>((resolve) => {
+      setTimeout(() => void handle.close().then(resolve), 60);
+    });
+
+    await repository.save(updated);
+    await released;
+
+    expect(await repository.load()).toEqual(updated);
+    expect(await readdir(directory)).toEqual(['library.json']);
   });
 
   it('creates the library on first run and persists every mutation', async () => {
