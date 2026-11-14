@@ -1,0 +1,35 @@
+.intro {
+  flex: none;
+  padding: var(--space-4) var(--space-4) 0;
+}
+
+.intro h2 {
+  font-size: 24px;
+}
+
+.intro p {
+  margin-top: var(--space-2);
+  font-size: 14px;
+  color: var(--color-text-muted);
+}
+
+.points {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  gap: var(--space-4);
+  min-height: 0;
+  padding: var(--space-4);
+  overflow-y: auto;
+}
+
+.footer {
+  display: flex;
+  flex: none;
+  padding: var(--space-4);
+  border-top: 1px solid var(--color-border);
+}
+
+.footer button {
+  flex: 1;
+}
