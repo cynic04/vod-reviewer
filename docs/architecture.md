@@ -46,6 +46,7 @@ src/
     library/         operations (pure rules), repository (JSON), service
     ipc/             handlers + the router that guards them
     media/           the streaming protocol
+    agent/           the summarize agent harness: MCP endpoint, tools, launcher, YouTube search
     videos/          directory browser, path safety
   preload/           The one bridge function exposed to the renderer
   renderer/src/      The React app
@@ -58,13 +59,14 @@ src/
       review/        step 4: the main review workspace
       player/        the media player (hooks + components)
       annotations/   notes and timestamps
+      session-notes/ AI summaries of review sessions, grouped by character
       characters/    portraits and folder labels
     store/           library store, selectors, toasts
     lib/             small utilities
     styles/          design tokens and global CSS
 scripts/             character art fetcher, icon generator, end-to-end smoke test
 build/               installer resources (app icon); electron-builder.yml is the config
-resources/           files loaded by the main process at runtime (window icon)
+resources/           files bundled into the main process (window icon, the agent's skill)
 ```
 
 Dependencies point one way: `renderer -> shared <- main`. Features may use `components`,
@@ -97,6 +99,18 @@ Consequences worth knowing:
 Writes are atomic (temp file + rename, with retries for files briefly locked by other
 programs), and an unreadable file is set aside rather than overwritten.
 
+One kind of change does not start in the window: the summarize agent handing in a
+summary. For that the main process pushes the new snapshot to the renderer
+(`onLibraryChanged`), and the store replaces its copy exactly as it does after a request.
+
+## The summarize agent
+
+Session summaries are written by the GitHub Copilot CLI, which the app starts in a
+terminal window and serves through a loopback MCP endpoint with three narrow tools. The
+agent is treated as untrusted in the same way the renderer is: it gets no file access and
+can only read one session and write one summary. The details are in
+[agent-harness.md](agent-harness.md).
+
 ## The IPC contract
 
 [`src/shared/ipc/contract.ts`](../src/shared/ipc/contract.ts) is the single definition of
@@ -118,6 +132,9 @@ The renderer is treated as untrusted, the way a web page would be:
 - Every request is checked for its sender and validated before it reaches a handler.
 - A strict Content-Security-Policy; no remote content is loaded at all.
 - Navigation away from the app and new windows are blocked.
+- The agent endpoint listens on loopback only, serves each run at an unguessable URL,
+  refuses browser-originated requests, and exposes nothing but that run's three tools.
+- Summaries are rendered from markdown to React elements; HTML inside them is not executed.
 - The renderer never receives `file://` access. Videos are served by the `vod-media://`
   protocol, which only resolves (a) videos that are in the library and (b) supported video
   files inside the configured videos folder. See [ADR 0003](decisions/0003-custom-media-protocol.md).
@@ -164,7 +181,7 @@ See [ADR 0004](decisions/0004-frame-stepping-and-frame-rate-detection.md).
 | Layer | Tool | What it covers |
 | --- | --- | --- |
 | Domain rules, frame/time/zoom maths, range parsing, persistence | Vitest (`npm test`) | Pure logic and the JSON repository against a temp directory. |
-| The whole app | Playwright driving Electron (`npm run test:e2e`) | The real built app through the full workflow, against a generated test video and throwaway data. |
+| The whole app | Playwright driving Electron (`npm run test:e2e`) | The real built app through the full workflow, against a generated test video and throwaway data. The test plays the summarize agent itself, so no AI credits are spent. |
 | Types and conventions | `npm run typecheck`, `npm run lint` | Strict TypeScript and type-aware ESLint, including the React Compiler-era hooks rules. |
 
 ## Decisions

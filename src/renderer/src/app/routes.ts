@@ -5,6 +5,8 @@ export const ROUTE_PATTERNS = {
   import: '/import',
   focus: '/videos/:videoId/focus',
   review: '/videos/:videoId/review',
+  sessionNotes: '/session-notes',
+  folderSessionNotes: '/folders/:folderId/session-notes',
 } as const;
 
 export const routes = {
@@ -13,6 +15,9 @@ export const routes = {
   import: (): string => '/import',
   focus: (videoId: string): string => `/videos/${encodeURIComponent(videoId)}/focus`,
   review: (videoId: string): string => `/videos/${encodeURIComponent(videoId)}/review`,
+  /** Session notes of every folder, or of one folder when given. */
+  sessionNotes: (folderId?: string): string =>
+    folderId === undefined ? '/session-notes' : `/folders/${encodeURIComponent(folderId)}/session-notes`,
 } as const;
 
 /** Router state passed along when the focus screen is reached from the import flow. */

@@ -39,6 +39,12 @@ export function AppLayout() {
           >
             Library
           </NavLink>
+          <NavLink
+            to={routes.sessionNotes()}
+            className={({ isActive }) => cx(styles.navLink, isActive && styles.navLinkActive)}
+          >
+            Session notes
+          </NavLink>
         </nav>
 
         <div className={styles.tools}>

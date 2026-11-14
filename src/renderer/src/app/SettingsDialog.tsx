@@ -1,5 +1,11 @@
 import { useState } from 'react';
-import { DEFAULT_STALE_AFTER_DAYS, THEME_PREFERENCES } from '@shared/domain/constants';
+import { CHARACTERS } from '@shared/domain/characters';
+import {
+  DEFAULT_STALE_AFTER_DAYS,
+  DEFAULT_SUMMARY_MODEL,
+  SUMMARY_MODEL_PATTERN,
+  THEME_PREFERENCES,
+} from '@shared/domain/constants';
 import type { ThemePreference } from '@shared/domain/schema';
 import { Button } from '@renderer/components/Button';
 import { Dialog } from '@renderer/components/Dialog';
@@ -24,6 +30,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
   const updateSettings = useLibraryStore((state) => state.updateSettings);
   const chooseVideosRoot = useLibraryStore((state) => state.chooseVideosRoot);
   const [staleDraft, setStaleDraft] = useState(String(settings.staleAfterDays));
+  const [modelDraft, setModelDraft] = useState(settings.summaryModel);
 
   const commitStaleAfterDays = (): void => {
     const days = Math.round(Number(staleDraft));
@@ -33,6 +40,16 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
     }
     setStaleDraft(String(days));
     if (days !== settings.staleAfterDays) void updateSettings({ staleAfterDays: days }).catch(reportError);
+  };
+
+  const commitSummaryModel = (): void => {
+    const model = modelDraft.trim();
+    if (!SUMMARY_MODEL_PATTERN.test(model)) {
+      setModelDraft(settings.summaryModel);
+      return;
+    }
+    setModelDraft(model);
+    if (model !== settings.summaryModel) void updateSettings({ summaryModel: model }).catch(reportError);
   };
 
   return (
@@ -74,6 +91,49 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             <span>days</span>
           </div>
           <p>Old footage is highlighted so you know it may not reflect how you play now. Default: {DEFAULT_STALE_AFTER_DAYS}.</p>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="player-character">Your character</label>
+          <select
+            id="player-character"
+            value={settings.playerCharacterId ?? ''}
+            onChange={(event) =>
+              void updateSettings({ playerCharacterId: event.target.value || null }).catch(reportError)
+            }
+          >
+            <option value="">Not set</option>
+            {CHARACTERS.map((character) => (
+              <option key={character.id} value={character.id}>
+                {character.name}
+              </option>
+            ))}
+          </select>
+          <p>Lets session summaries look for footage and advice for your side of each matchup.</p>
+        </div>
+
+        <div className={styles.field}>
+          <label htmlFor="summary-model">Summary model</label>
+          <input
+            id="summary-model"
+            type="text"
+            list="summary-models"
+            value={modelDraft}
+            spellCheck={false}
+            onChange={(event) => setModelDraft(event.target.value)}
+            onBlur={commitSummaryModel}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') event.currentTarget.blur();
+            }}
+          />
+          <datalist id="summary-models">
+            <option value={DEFAULT_SUMMARY_MODEL} />
+            <option value="auto" />
+          </datalist>
+          <p>
+            The GitHub Copilot model that writes session summaries. A small model keeps the cost down;
+            default: {DEFAULT_SUMMARY_MODEL}.
+          </p>
         </div>
 
         <div className={styles.field}>

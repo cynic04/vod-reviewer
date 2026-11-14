@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTERS, matchupFolderId } from '@shared/domain/characters';
 import { librarySchema, type Library } from '@shared/domain/schema';
 import {
+  completeSummary,
   createEmptyLibrary,
   createFolder,
   createNote,
@@ -10,8 +11,12 @@ import {
   reconcileMatchupFolders,
   removeFolder,
   removeNote,
+  removeSummary,
   removeVideo,
   renameFolder,
+  requestSummary,
+  settleInterruptedSummaries,
+  updateSettings,
   updateVideo,
   type OperationContext,
 } from './operations';
@@ -148,6 +153,59 @@ describe('library operations', () => {
 
     const removed = removeVideo(withNote.library, videoId);
     expect(removed).toMatchObject({ videos: [], timestamps: [], notes: [], sessions: [] });
+  });
+
+  it('keeps the previous summary text until a regenerated one arrives', () => {
+    const ctx = testContext();
+    const { library, videoId } = libraryWithVideo(ctx);
+    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
+
+    const first = requestSummary(withNote, note.sessionId, ctx);
+    expect(first.summary).toMatchObject({ status: 'pending', markdown: '', model: 'claude-haiku-4.5' });
+    const written = completeSummary(first.library, first.summary.id, '  ## Overview  ', ctx);
+    expect(written.summaries).toMatchObject([{ status: 'ready', markdown: '## Overview' }]);
+
+    const again = requestSummary(written, note.sessionId, ctx);
+    expect(again.library.summaries).toHaveLength(1);
+    expect(again.summary).toMatchObject({ status: 'pending', markdown: '## Overview' });
+    expect(again.summary.id).not.toBe(first.summary.id);
+
+    // Cancelling the regeneration, or restarting the app mid-run, falls back to the old text.
+    expect(removeSummary(again.library, again.summary.id).summaries).toMatchObject([
+      { status: 'ready', markdown: '## Overview' },
+    ]);
+    expect(settleInterruptedSummaries(again.library).summaries).toMatchObject([{ status: 'ready' }]);
+    // A first run that never finished leaves nothing behind.
+    expect(settleInterruptedSummaries(first.library).summaries).toEqual([]);
+    expect(removeSummary(written, first.summary.id).summaries).toEqual([]);
+  });
+
+  it('only summarizes sessions that exist, and only accepts a summary once', () => {
+    const ctx = testContext();
+    const { library, videoId } = libraryWithVideo(ctx);
+    expect(() => requestSummary(library, 'no-session', ctx)).toThrow(/does not exist/);
+
+    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
+    const { library: pending, summary } = requestSummary(withNote, note.sessionId, ctx);
+    expect(() => completeSummary(pending, summary.id, '   ', ctx)).toThrow(/empty/);
+    const done = completeSummary(pending, summary.id, 'text', ctx);
+    expect(() => completeSummary(done, summary.id, 'again', ctx)).toThrow(/already been saved/);
+  });
+
+  it('drops a summary with its session or its video', () => {
+    const ctx = testContext();
+    const { library, videoId } = libraryWithVideo(ctx);
+    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
+    const { library: summarized } = requestSummary(withNote, note.sessionId, ctx);
+
+    expect(removeNote(summarized, note.id).summaries).toEqual([]);
+    expect(removeVideo(summarized, videoId).summaries).toEqual([]);
+  });
+
+  it('only accepts a roster character as the player character', () => {
+    const library = createEmptyLibrary(testContext());
+    expect(updateSettings(library, { playerCharacterId: 'mll' }).settings.playerCharacterId).toBe('mll');
+    expect(() => updateSettings(library, { playerCharacterId: 'ryu' })).toThrow(/not a character/);
   });
 
   it('protects matchup folders and non-empty custom folders', () => {

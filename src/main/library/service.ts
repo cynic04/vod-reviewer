@@ -1,5 +1,10 @@
 import type { Library } from '@shared/domain/schema';
-import { createEmptyLibrary, reconcileMatchupFolders, type OperationContext } from './operations';
+import {
+  createEmptyLibrary,
+  reconcileMatchupFolders,
+  settleInterruptedSummaries,
+  type OperationContext,
+} from './operations';
 import type { LibraryRepository } from './repository';
 
 /**
@@ -22,7 +27,9 @@ export class LibraryService {
 
   static async open(repository: LibraryRepository, context: OperationContext): Promise<LibraryService> {
     const stored = await repository.load();
-    const library = reconcileMatchupFolders(stored ?? createEmptyLibrary(context), context);
+    const library = settleInterruptedSummaries(
+      reconcileMatchupFolders(stored ?? createEmptyLibrary(context), context),
+    );
     if (library !== stored) await repository.save(library);
     return new LibraryService(repository, context, library);
   }

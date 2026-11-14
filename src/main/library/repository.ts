@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { mkdir, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { LIBRARY_SCHEMA_VERSION } from '@shared/domain/constants';
+import { DEFAULT_SUMMARY_MODEL, LIBRARY_SCHEMA_VERSION } from '@shared/domain/constants';
 import { librarySchema, type Library } from '@shared/domain/schema';
 
 export interface LibraryRepository {
@@ -34,18 +34,46 @@ async function renameWithRetry(from: string, to: string): Promise<void> {
   await rename(from, to);
 }
 
+type RawLibrary = Record<string, unknown> & { schemaVersion: number };
+
 /**
- * Brings a parsed file up to the current schema version. There is only one version so
- * far; when the schema changes, add a step per version here (`1 -> 2`, `2 -> 3`, ...).
+ * One step per schema version: `MIGRATIONS[n]` turns a version `n` file into version
+ * `n + 1`. Steps only add what the newer schema needs; validation happens afterwards.
  */
-function migrate(raw: unknown): unknown {
-  if (typeof raw !== 'object' || raw === null || !('schemaVersion' in raw)) return raw;
-  if (typeof raw.schemaVersion === 'number' && raw.schemaVersion > LIBRARY_SCHEMA_VERSION) {
+const MIGRATIONS: Record<number, (library: RawLibrary) => RawLibrary> = {
+  // 2: session summaries, and the settings the summarize agent needs.
+  1: (library) => ({
+    ...library,
+    schemaVersion: 2,
+    settings: {
+      ...(typeof library.settings === 'object' ? library.settings : {}),
+      playerCharacterId: null,
+      summaryModel: DEFAULT_SUMMARY_MODEL,
+    },
+    summaries: [],
+  }),
+};
+
+function isRawLibrary(raw: unknown): raw is RawLibrary {
+  return typeof raw === 'object' && raw !== null && 'schemaVersion' in raw && typeof raw.schemaVersion === 'number';
+}
+
+/** Brings a parsed file up to the current schema version, one version at a time. */
+export function migrate(raw: unknown): unknown {
+  if (!isRawLibrary(raw)) return raw;
+  if (raw.schemaVersion > LIBRARY_SCHEMA_VERSION) {
     throw new Error(
       `The library file was written by a newer version of the app (schema ${raw.schemaVersion}).`,
     );
   }
-  return raw;
+
+  let library = raw;
+  while (library.schemaVersion < LIBRARY_SCHEMA_VERSION) {
+    const step = MIGRATIONS[library.schemaVersion];
+    if (!step) throw new Error(`No migration from library schema ${library.schemaVersion}.`);
+    library = step(library);
+  }
+  return library;
 }
 
 /** Stores the whole library as one human-readable JSON document. */

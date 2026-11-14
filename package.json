@@ -1,6 +1,6 @@
 {
   "name": "vod-reviewer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "VOD review desk for fighting game players, built around Guilty Gear -Strive- matchups.",
   "main": "./out/main/index.js",
@@ -38,7 +38,9 @@
     "playwright-core": "^1.65.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
+    "react-markdown": "^10.1.0",
     "react-router-dom": "^7.18.5",
+    "remark-gfm": "^4.0.1",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.72.2",
     "vite": "^8.3.8",

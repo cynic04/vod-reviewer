@@ -21,6 +21,9 @@ erDiagram
     VIDEO ||--o{ REVIEW_SESSION : "is reviewed in"
     VIDEO ||--o{ NOTE : "is annotated by"
     REVIEW_SESSION ||--|{ NOTE : "produces"
+    REVIEW_SESSION ||--o| SESSION_SUMMARY : "is summarized by"
+    VIDEO ||--o{ SESSION_SUMMARY : "has"
+    CHARACTER |o--o| SETTINGS : "is the player's character in"
 
     CHARACTER {
         string id PK "slug, e.g. sol"
@@ -71,10 +74,22 @@ erDiagram
         datetime created_at
         datetime updated_at
     }
+    SESSION_SUMMARY {
+        string id PK
+        string session_id FK "unique: one summary per session"
+        string video_id FK
+        string status "pending | ready"
+        text markdown "written by the summarize agent"
+        string model "Copilot model that wrote it"
+        datetime requested_at
+        datetime completed_at "null until first completed"
+    }
     SETTINGS {
         string theme "system | light | dark"
         string videos_root "null = OS Videos folder"
         int stale_after_days "default 15"
+        string player_character_id FK "null = not set"
+        string summary_model "default claude-haiku-4.5"
     }
 ```
 
@@ -91,7 +106,8 @@ stored in `library.json`, but it would be a seeded lookup table in a database.
 | Timestamp | `timestamps` | A named position in a video. `focus` points are set in the import flow ("where should this review concentrate?"); `bookmark`s are added while reviewing. Clicking one seeks the video. |
 | Review session | `sessions` | One sitting of note-taking on a video. Created with the first note written after opening the review screen. |
 | Note | `notes` | Free text pinned to a position in a video, written during a session. |
-| Settings | `settings` | Theme, the import browser's root folder, and the "old video" threshold. |
+| Session summary | `summaries` | The AI-written coaching summary of one session, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
+| Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, and the model that writes summaries. |
 
 ## Rules the application enforces
 
@@ -108,18 +124,34 @@ unit-tested. In a database most of them become constraints.
 | Removing a video removes its timestamps, sessions and notes. | `ON DELETE CASCADE` |
 | A note's session must belong to the same video as the note. | Composite FK `(session_id, video_id)` |
 | A session never exists without notes: deleting its last note deletes it. | Application rule / trigger |
+| A session has at most one summary; summarizing again replaces it. | `UNIQUE (session_id)` |
+| A summary goes with its session and its video. | `ON DELETE CASCADE` on both |
+| Only a pending summary accepts text, once. | Application rule (`status` transition) |
+| Cancelling a regeneration restores the previous text. | Application rule |
+| The player's character must be in the roster. | `FOREIGN KEY (player_character_id)` |
 | New characters in the roster get a matchup folder on next launch. | Seed migration |
 
 `Note.videoId` is deliberately redundant with `Note.sessionId -> ReviewSession.videoId`.
 Notes are read per video far more often than per session, and the duplication keeps that
 read a single filter (and, later, a single indexed lookup) instead of a join.
+`SessionSummary.videoId` is redundant in the same way and for the same reason.
+
+The Session notes view groups summaries by character. That grouping is derived, not
+stored: summary -> session -> video -> folder -> character, with videos in custom
+folders falling under "Miscellaneous".
 
 ## Example file
 
 ```json
 {
-  "schemaVersion": 1,
-  "settings": { "theme": "dark", "videosRoot": null, "staleAfterDays": 15 },
+  "schemaVersion": 2,
+  "settings": {
+    "theme": "dark",
+    "videosRoot": null,
+    "staleAfterDays": 15,
+    "playerCharacterId": "mll",
+    "summaryModel": "claude-haiku-4.5"
+  },
   "folders": [
     { "id": "matchup-sol", "name": "Sol Badguy", "kind": "matchup", "characterId": "sol", "createdAt": "2026-11-14T09:00:00.000Z" },
     { "id": "5f0c...", "name": "Tournament sets", "kind": "custom", "characterId": null, "createdAt": "2026-11-14T09:30:00.000Z" }
@@ -147,6 +179,9 @@ read a single filter (and, later, a single indexed lookup) instead of a join.
   ],
   "notes": [
     { "id": "e3aa...", "videoId": "a41e...", "sessionId": "77d0...", "timeSeconds": 191.75, "body": "Dropped the combo after 6P - practise the route", "createdAt": "2026-11-14T09:12:00.000Z", "updatedAt": "2026-11-14T09:12:00.000Z" }
+  ],
+  "summaries": [
+    { "id": "19c4...", "sessionId": "77d0...", "videoId": "a41e...", "status": "ready", "markdown": "## Overview\n\nYou lost most rounds to...", "model": "claude-haiku-4.5", "requestedAt": "2026-11-14T09:26:00.000Z", "completedAt": "2026-11-14T09:26:40.000Z" }
   ]
 }
 ```
@@ -219,11 +254,25 @@ CREATE TABLE note (
 );
 CREATE INDEX note_video_time ON note (video_id, time_seconds);
 
+CREATE TABLE session_summary (
+  id           TEXT PRIMARY KEY,
+  session_id   TEXT NOT NULL UNIQUE,
+  video_id     TEXT NOT NULL REFERENCES video (id) ON DELETE CASCADE,
+  status       TEXT NOT NULL CHECK (status IN ('pending', 'ready')),
+  markdown     TEXT NOT NULL DEFAULT '',
+  model        TEXT NOT NULL,
+  requested_at TIMESTAMPTZ NOT NULL,
+  completed_at TIMESTAMPTZ,
+  FOREIGN KEY (session_id, video_id) REFERENCES review_session (id, video_id) ON DELETE CASCADE
+);
+
 CREATE TABLE settings (
-  id               INTEGER PRIMARY KEY CHECK (id = 1),
-  theme            TEXT NOT NULL DEFAULT 'system' CHECK (theme IN ('system', 'light', 'dark')),
-  videos_root      TEXT,
-  stale_after_days INTEGER NOT NULL DEFAULT 15 CHECK (stale_after_days >= 1)
+  id                  INTEGER PRIMARY KEY CHECK (id = 1),
+  theme               TEXT NOT NULL DEFAULT 'system' CHECK (theme IN ('system', 'light', 'dark')),
+  videos_root         TEXT,
+  stale_after_days    INTEGER NOT NULL DEFAULT 15 CHECK (stale_after_days >= 1),
+  player_character_id TEXT REFERENCES character (id),
+  summary_model       TEXT NOT NULL DEFAULT 'claude-haiku-4.5'
 );
 ```
 
@@ -242,8 +291,13 @@ What changes in the code when that day comes:
 
 ## Versioning
 
-`schemaVersion` is checked on load. A file written by a newer version of the app is
-refused rather than guessed at, and `migrate()` in `repository.ts` is the place where
-`1 -> 2` style upgrades go. A file that cannot be parsed is **renamed**
+`schemaVersion` is checked on load and the file is upgraded one version at a time by the
+steps in `MIGRATIONS` (`repository.ts`). A file written by a newer version of the app is
+refused rather than guessed at.
+
+| Version | Change |
+| --- | --- |
+| 1 | Initial schema. |
+| 2 | Added `summaries`, `settings.playerCharacterId` and `settings.summaryModel`. | A file that cannot be parsed is **renamed**
 (`library.unreadable-<timestamp>.json`), never overwritten, so a bad edit or a bug can
 not destroy notes.

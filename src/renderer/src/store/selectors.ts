@@ -1,4 +1,13 @@
-import type { Folder, Library, Note, ReviewSession, Timestamp, Video } from '@shared/domain/schema';
+import { CHARACTERS, getCharacter, type Character } from '@shared/domain/characters';
+import type {
+  Folder,
+  Library,
+  Note,
+  ReviewSession,
+  SessionSummary,
+  Timestamp,
+  Video,
+} from '@shared/domain/schema';
 
 /** Pure read-side queries over the normalised library. */
 
@@ -74,4 +83,77 @@ export function selectAnnotationCounts(library: Library): Map<string, Annotation
   for (const note of library.notes) entry(note.videoId).notes += 1;
   for (const timestamp of library.timestamps) entry(timestamp.videoId).timestamps += 1;
   return counts;
+}
+
+export function selectSummaryForSession(library: Library, sessionId: string | null): SessionSummary | undefined {
+  return sessionId === null ? undefined : library.summaries.find((summary) => summary.sessionId === sessionId);
+}
+
+/** One review session with everything the session notes view shows about it. */
+export interface SessionEntry {
+  session: ReviewSession;
+  video: Video;
+  folder: Folder;
+  /** Sorted by position in the video. */
+  notes: Note[];
+  summary: SessionSummary | undefined;
+}
+
+export interface SessionGroup {
+  key: string;
+  /** `null` for the "Miscellaneous" group: sessions on videos that are not filed under a matchup. */
+  character: Character | null;
+  /** Newest session first. */
+  entries: SessionEntry[];
+}
+
+const MISCELLANEOUS_KEY = 'miscellaneous';
+
+/**
+ * Review sessions grouped by the character of their matchup, in roster order, with
+ * everything else under "Miscellaneous" at the end. Pass `folderId` to keep one folder only.
+ */
+export function selectSessionGroups(library: Library, folderId?: string): SessionGroup[] {
+  const videos = new Map(library.videos.map((video) => [video.id, video]));
+  const folders = new Map(library.folders.map((folder) => [folder.id, folder]));
+  const summaries = new Map(library.summaries.map((summary) => [summary.sessionId, summary]));
+  const notesBySession = new Map<string, Note[]>();
+  for (const note of library.notes) {
+    const notes = notesBySession.get(note.sessionId);
+    if (notes) notes.push(note);
+    else notesBySession.set(note.sessionId, [note]);
+  }
+
+  const entriesByGroup = new Map<string, SessionEntry[]>();
+  for (const session of library.sessions) {
+    const video = videos.get(session.videoId);
+    const folder = video && folders.get(video.folderId);
+    if (!video || !folder || (folderId !== undefined && folder.id !== folderId)) continue;
+
+    const key = getCharacter(folder.characterId)?.id ?? MISCELLANEOUS_KEY;
+    const entry: SessionEntry = {
+      session,
+      video,
+      folder,
+      notes: (notesBySession.get(session.id) ?? []).sort(byTime),
+      summary: summaries.get(session.id),
+    };
+    const entries = entriesByGroup.get(key);
+    if (entries) entries.push(entry);
+    else entriesByGroup.set(key, [entry]);
+  }
+
+  const newestFirst = (a: SessionEntry, b: SessionEntry): number =>
+    b.session.startedAt.localeCompare(a.session.startedAt);
+
+  const groups: SessionGroup[] = [];
+  for (const character of CHARACTERS) {
+    const entries = entriesByGroup.get(character.id);
+    if (entries) groups.push({ key: character.id, character, entries: entries.sort(newestFirst) });
+  }
+  const miscellaneous = entriesByGroup.get(MISCELLANEOUS_KEY);
+  if (miscellaneous) {
+    groups.push({ key: MISCELLANEOUS_KEY, character: null, entries: miscellaneous.sort(newestFirst) });
+  }
+  return groups;
 }

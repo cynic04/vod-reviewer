@@ -15,7 +15,7 @@
  */
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readFile, rm, utimes } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, utimes } from 'node:fs/promises';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { _electron as electron } from 'playwright-core';
@@ -59,7 +59,13 @@ async function main() {
   const packagedExecutable = process.env.VOD_REVIEWER_E2E_EXECUTABLE;
   const app = await electron.launch({
     ...(packagedExecutable ? { executablePath: path.resolve(packagedExecutable), args: [] } : { args: [ROOT] }),
-    env: { ...process.env, VOD_REVIEWER_USER_DATA: USER_DATA_DIR, VOD_REVIEWER_VIDEOS_ROOT: VIDEOS_DIR },
+    env: {
+      ...process.env,
+      VOD_REVIEWER_USER_DATA: USER_DATA_DIR,
+      VOD_REVIEWER_VIDEOS_ROOT: VIDEOS_DIR,
+      // The app prepares summarize runs but starts no Copilot CLI; this test plays the agent.
+      VOD_REVIEWER_AGENT_DRY_RUN: '1',
+    },
   });
 
   try {
@@ -199,6 +205,50 @@ async function main() {
     assert.ok(Math.abs(withNote.notes[0].timeSeconds - noteTime) < 0.001, 'note pinned to the playhead');
     assert.equal(withNote.notes[0].sessionId, withNote.sessions[0].id, 'note belongs to the session');
 
+    step('   summarize: the harness briefs the agent and shows the summary it hands in');
+    await page.getByRole('button', { name: 'Summarize', exact: true }).click();
+    await page.getByText('Copilot is summarizing this session').waitFor();
+    const agentDir = path.join(USER_DATA_DIR, 'agent');
+    const runFiles = await readdir(path.join(agentDir, 'runs'));
+    const launcher = await readFile(path.join(agentDir, 'runs', runFiles.find((file) => file.endsWith('.cmd'))), 'utf8');
+    assert.match(launcher, /copilot --prompt \/summarize --model claude-haiku-4\.5 /, 'launcher runs the skill on a small model');
+    assert.match(await readFile(path.join(agentDir, '.github/skills/summarize/SKILL.md'), 'utf8'), /^---\r?\nname: summarize/);
+    const mcpConfig = JSON.parse(await readFile(path.join(agentDir, 'runs', runFiles.find((file) => file.endsWith('.mcp.json'))), 'utf8'));
+    const agentEndpoint = mcpConfig.mcpServers['vod-reviewer'].url;
+    let rpcId = 0;
+    const rpc = async (method, params) => {
+      const response = await fetch(agentEndpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: (rpcId += 1), method, params }),
+      });
+      return (await response.json()).result;
+    };
+    const callTool = async (name, args = {}) => (await rpc('tools/call', { name, arguments: args })).content[0].text;
+    await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
+    assert.deepEqual(
+      (await rpc('tools/list')).tools.map((tool) => tool.name),
+      ['get_review_session', 'youtube_search', 'save_summary'],
+    );
+    const brief = JSON.parse(await callTool('get_review_session'));
+    assert.equal(brief.matchup.opponent, 'Sol Badguy');
+    assert.equal(brief.notes[0].text, 'Dropped the combo after 6P - practise the route');
+    await callTool('save_summary', {
+      markdown: '## Overview\n\nYou drop the 6P route under pressure.\n\n## Study material\n\n- [Combo guide](https://www.youtube.com/watch?v=abc) - the route.\n\n<script>window.pwned = true</script>',
+    });
+    // The agent's save reaches the open window without any request from it.
+    await page.getByRole('link', { name: 'View summary' }).click();
+    await page.getByRole('heading', { name: 'Session notes', level: 1 }).waitFor();
+    await page.getByRole('heading', { name: 'Overview' }).waitFor();
+    const studyLink = page.getByRole('link', { name: 'Combo guide' });
+    assert.equal(await studyLink.getAttribute('target'), '_blank', 'links open outside the app');
+    assert.equal(await page.evaluate(() => window.pwned), undefined, 'HTML in a summary is not executed');
+    await screenshot('05a-session-notes');
+    await page.getByRole('link', { name: 'Session notes', exact: true }).click();
+    await page.getByRole('heading', { name: 'vs. Sol Badguy', level: 2 }).waitFor();
+    await page.getByRole('link', { name: 'ranked-set', exact: true }).click();
+    await waitForPlayer();
+
     step('   timestamps jump the video when clicked');
     await page.evaluate(() => {
       document.querySelector('video').currentTime = 6;
@@ -209,6 +259,18 @@ async function main() {
     await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 3) < 0.05);
     await page.getByRole('button', { name: /^Jump to 0:06/ }).click();
     await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 6) < 0.05);
+
+    step('   notes fold away under the timestamp they belong to');
+    await page.getByRole('tab', { name: /Notes/ }).click();
+    const noteGroup = page.getByRole('button', { name: /Round 2 - lost neutral\s*1$/ });
+    const groupedNote = page.getByRole('listitem').getByText('Dropped the combo after 6P');
+    await groupedNote.waitFor();
+    assert.equal(await noteGroup.getAttribute('aria-expanded'), 'true');
+    await noteGroup.click();
+    await groupedNote.waitFor({ state: 'detached' });
+    assert.equal(await noteGroup.getAttribute('aria-expanded'), 'false');
+    await page.getByRole('button', { name: 'Expand all' }).click();
+    await groupedNote.waitFor();
 
     step('   the scrubber seeks and the picture toggles playback');
     const stage = page.getByRole('region', { name: 'Video player' });
@@ -303,7 +365,7 @@ async function main() {
     await page.getByRole('button', { name: 'Remove from library' }).click();
     await page.getByRole('button', { name: 'Remove video' }).click();
     const emptied = await expectLibrary((l) => l.videos.length === 0, 'video removed');
-    assert.deepEqual([emptied.notes, emptied.timestamps, emptied.sessions], [[], [], []]);
+    assert.deepEqual([emptied.notes, emptied.timestamps, emptied.sessions, emptied.summaries], [[], [], [], []]);
     await readFile(path.join(VIDEOS_DIR, SAMPLE_NAME));
 
     assert.deepEqual(errors, [], 'no errors were logged by the renderer');

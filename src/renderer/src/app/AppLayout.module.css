@@ -36,6 +36,11 @@
   color: var(--red-500);
 }
 
+.topbar nav {
+  display: flex;
+  gap: var(--space-4);
+}
+
 .navLink {
   display: inline-flex;
   align-items: center;

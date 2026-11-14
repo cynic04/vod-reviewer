@@ -74,6 +74,10 @@ No fonts are bundled or downloaded; the app uses what Windows ships.
   greyscale and dimmed; the ones with videos are in colour with a red count badge.
 - **Timeline markers.** Yellow triangle = focus point, red triangle = timestamp added in
   review, small square = note. All are real buttons and can be reached by keyboard.
+- **Long-form text.** AI summaries are the only prose in the app. They are set in the
+  body face at a 74-character measure with 1.65 line height; section headings keep the
+  display face, pattern headings switch to bold body text with a red rule so that a
+  summary reads as a document rather than as more UI.
 - **Time is always clickable.** Anywhere a timecode appears as a chip, clicking it seeks
   the video there.
 
