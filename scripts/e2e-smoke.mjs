@@ -4,6 +4,11 @@
  *
  *   npm run build && npm run test:e2e
  *
+ * To run the same test against the packaged app:
+ *
+ *   npm run package:dir
+ *   $env:VOD_REVIEWER_E2E_EXECUTABLE = "dist/win-unpacked/VOD Reviewer.exe"; npm run test:e2e
+ *
  * Nothing here touches your real library or Videos folder: the app is pointed at
  * `.e2e/` through the VOD_REVIEWER_USER_DATA and VOD_REVIEWER_VIDEOS_ROOT overrides.
  * Screenshots of each screen are written to `.e2e/screens/`.
@@ -49,8 +54,11 @@ const readLibrary = async () => JSON.parse(await readFile(path.join(USER_DATA_DI
 async function main() {
   await prepareFixtures();
 
+  // Set VOD_REVIEWER_E2E_EXECUTABLE to test a packaged build, e.g.
+  // "dist/win-unpacked/VOD Reviewer.exe", instead of the app in this repository.
+  const packagedExecutable = process.env.VOD_REVIEWER_E2E_EXECUTABLE;
   const app = await electron.launch({
-    args: [ROOT],
+    ...(packagedExecutable ? { executablePath: path.resolve(packagedExecutable), args: [] } : { args: [ROOT] }),
     env: { ...process.env, VOD_REVIEWER_USER_DATA: USER_DATA_DIR, VOD_REVIEWER_VIDEOS_ROOT: VIDEOS_DIR },
   });
 

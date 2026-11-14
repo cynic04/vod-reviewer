@@ -62,7 +62,9 @@ src/
     store/           library store, selectors, toasts
     lib/             small utilities
     styles/          design tokens and global CSS
-scripts/             character art fetcher, end-to-end smoke test
+scripts/             character art fetcher, icon generator, end-to-end smoke test
+build/               installer resources (app icon); electron-builder.yml is the config
+resources/           files loaded by the main process at runtime (window icon)
 ```
 
 Dependencies point one way: `renderer -> shared <- main`. Features may use `components`,

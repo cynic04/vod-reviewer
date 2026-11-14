@@ -41,9 +41,24 @@ interface wears the game's colours in light and dark mode.
 
 Steps 3 and 4 can be reopened for any video from its folder.
 
-## Getting started
+## Install it as a desktop app
 
-Requires [Node.js](https://nodejs.org) 22 or newer.
+Requires [Node.js](https://nodejs.org) 22 or newer to build.
+
+```bash
+npm install
+npm run package
+```
+
+Then run `dist\VOD-Reviewer-Setup-<version>.exe`. It installs for your user only (no
+administrator prompt), adds **VOD Reviewer** to your desktop and Start menu, and opens the
+app. From there you can pin it to the taskbar like any other program.
+
+The installer is not code-signed, so Windows SmartScreen warns the first time: choose
+*More info*, then *Run anyway*. To upgrade, build and run a newer installer; your library
+is kept. Uninstalling keeps it too.
+
+## Development
 
 ```bash
 npm install
@@ -58,11 +73,14 @@ npm start        # build and run the production build
 | `npm run dev` | Start the app in development mode with hot reload |
 | `npm start` | Build, then run the built app |
 | `npm run build` | Type-check and build into `out/` |
+| `npm run package` | Build the Windows installer into `dist/` |
+| `npm run package:dir` | Build the unpacked app only (`dist/win-unpacked`), which is faster |
 | `npm test` | Unit tests (Vitest) |
 | `npm run test:e2e` | End-to-end smoke test of the built app (run `npm run build` first) |
 | `npm run typecheck` | Strict TypeScript check of both processes |
 | `npm run lint` | ESLint, type-aware |
 | `npm run fetch:characters` | Re-download the character portraits (after a roster change) |
+| `npm run make:icon -- <id>` | Regenerate the app icon from a character portrait (default `mll`, Millia Rage) |
 
 ## Keyboard shortcuts
 
@@ -91,7 +109,8 @@ Everything the app knows is in one human-readable file:
 ```
 
 It holds your folders, the videos you added (by path), timestamps, notes, review sessions
-and settings. Back it up or sync it like any other file. Its structure, and how it maps
+and settings. The installed app and a development run share this one file. Back it up or
+sync it like any other file. Its structure, and how it maps
 onto database tables, is documented in [docs/data-model.md](docs/data-model.md).
 
 ## Supported videos
@@ -108,7 +127,9 @@ src/
   preload/      the bridge between the two
   renderer/     the React app (features: library, import, focus, review, player, annotations)
 docs/           architecture, data model + ERD, design system, decision records
-scripts/        character art fetcher, end-to-end smoke test
+scripts/        character art fetcher, icon generator, end-to-end smoke test
+build/          installer resources (the app icon)
+resources/      files the main process loads at runtime (the window icon)
 ```
 
 ## Documentation
@@ -124,11 +145,11 @@ scripts/        character art fetcher, end-to-end smoke test
   playing (the player says so). There is no re-link feature yet; remove and re-add it.
 - Frame stepping assumes a constant frame rate, which is what OBS and ShadowPlay record.
   Until a new video has played for a second or two, 60 fps is assumed.
-- The app is not packaged into an installer; it runs from this repository.
+- The installer is Windows-only, unsigned, and has no auto-update.
 
 ## Credits
 
 Guilty Gear -Strive- and its character artwork are (c) ARC SYSTEM WORKS. The portraits in
 `src/renderer/src/assets/characters` come from the official site and are included because
-this repository is private and the app is not distributed. This is a fan-made tool with
+this repository is private and the app is not distributed; the app icon is made from one. This is a fan-made tool with
 no affiliation with Arc System Works.

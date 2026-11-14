@@ -13,3 +13,4 @@ it costs. Add a new numbered file when a decision of similar weight is made or r
 | [0006](0006-renderer-state-and-styling.md) | zustand mirror + URL-driven workflow; CSS Modules with design tokens |
 | [0007](0007-character-roster-and-art.md) | Ship the roster as code and commit the official portraits |
 | [0008](0008-review-sessions.md) | Group notes into implicit review sessions |
+| [0009](0009-packaging.md) | Package for Windows with electron-builder |
