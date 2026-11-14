@@ -1,7 +1,8 @@
 # Data model
 
 The library is stored as **one JSON document**, `library.json`, in the app's user-data
-folder (`%APPDATA%\vod-reviewer\library.json` on Windows). It is shaped like a relational
+folder (`%APPDATA%\vod-reviewer\library.json` on Windows, for both the installed app and
+development runs). It is shaped like a relational
 database on purpose: every entity is a flat record in its own array, and records point at
 each other **by id only** - nothing is nested. Moving to a real database is therefore a
 mechanical exercise: each array becomes a table, each `...Id` field becomes a foreign key.
