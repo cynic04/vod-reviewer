@@ -1,0 +1,106 @@
+.timeline {
+  position: relative;
+  padding: 14px var(--space-4) 0;
+  background: var(--color-surface);
+}
+
+.track {
+  position: relative;
+  height: 22px;
+  cursor: pointer;
+  touch-action: none;
+}
+
+.track[aria-disabled='true'] {
+  cursor: default;
+  opacity: 0.5;
+}
+
+.rail {
+  position: absolute;
+  inset: 8px 0;
+  background: var(--color-border);
+  overflow: hidden;
+  transition: inset var(--duration-fast) var(--easing);
+}
+
+.track:hover .rail {
+  inset: 6px 0;
+}
+
+.progress {
+  height: 100%;
+  background: var(--color-accent);
+}
+
+.playhead {
+  position: absolute;
+  top: 1px;
+  bottom: 1px;
+  width: 4px;
+  margin-left: -2px;
+  background: var(--color-text);
+  transform: skewX(-12deg);
+  pointer-events: none;
+}
+
+.hoverTime {
+  position: absolute;
+  bottom: calc(100% + 16px);
+  transform: translateX(-50%);
+  padding: 2px var(--space-2);
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 2;
+}
+
+.markers {
+  position: absolute;
+  top: 2px;
+  left: var(--space-4);
+  right: var(--space-4);
+  height: 12px;
+}
+
+.markers li {
+  position: absolute;
+  top: 0;
+}
+
+.marker {
+  display: block;
+  width: 10px;
+  height: 12px;
+  margin-left: -5px;
+  padding: 0;
+  border: 0;
+  background: var(--color-text-muted);
+  clip-path: polygon(0 0, 100% 0, 50% 100%);
+  transition: transform var(--duration-fast) var(--easing);
+}
+
+.marker:hover,
+.marker:focus-visible {
+  transform: scale(1.5);
+  transform-origin: 50% 100%;
+}
+
+.focus {
+  background: var(--color-highlight);
+}
+
+.bookmark {
+  background: var(--color-accent-hover);
+}
+
+.note {
+  background: var(--color-text);
+  width: 6px;
+  height: 8px;
+  margin: 4px 0 0 -3px;
+  clip-path: none;
+}
