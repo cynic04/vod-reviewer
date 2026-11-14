@@ -69,7 +69,28 @@ async function main() {
     page.on('console', (message) => {
       if (message.type() === 'error') errors.push(message.text());
     });
-    await page.setViewportSize({ width: 1440, height: 900 });
+
+    // Resize the real window rather than emulating a viewport: an emulated viewport larger
+    // than the window's content area lays the page out past the window's edges, which
+    // looks like buttons being cut off.
+    const resizeWindow = async (width, height) => {
+      await app.evaluate(({ BrowserWindow }, size) => {
+        const [window] = BrowserWindow.getAllWindows();
+        if (size) window.setContentSize(size.width, size.height);
+        else window.setSize(...window.getMinimumSize());
+      }, width ? { width, height } : null);
+      await page.waitForTimeout(300);
+    };
+    /** Asserts that a control is completely inside the window, i.e. visible and clickable. */
+    const expectFullyVisible = async (locator, description) => {
+      const box = await locator.boundingBox();
+      const viewport = await page.evaluate(() => ({ width: innerWidth, height: innerHeight }));
+      assert.ok(
+        box && box.x >= 0 && box.y >= 0 && box.x + box.width <= viewport.width + 1 && box.y + box.height <= viewport.height + 1,
+        `${description} is cut off at ${viewport.width}x${viewport.height}`,
+      );
+    };
+    await resizeWindow(1440, 900);
 
     /** Screenshots wait for every video to have a decoded frame and for transitions to settle. */
     const screenshot = async (name) => {
@@ -130,10 +151,23 @@ async function main() {
     await focusLabel.press('Enter');
     await expectLibrary((l) => l.timestamps[0]?.label === 'Round 2 - lost neutral', 'labelled focus point');
     await screenshot('04-focus-points');
+
+    step('   nothing is cut off at the smallest window size');
+    await resizeWindow();
+    await expectFullyVisible(page.getByRole('button', { name: 'Start review' }), 'Start review');
+    await expectFullyVisible(page.getByRole('button', { name: /^Mark/ }), 'Mark focus point');
+    await expectFullyVisible(page.getByRole('toolbar', { name: 'Playback controls' }), 'Playback controls');
+    for (const name of ['Play (Space)', 'Next frame (.)', 'Zoom in (+)', 'Reset zoom (0)', 'Mute']) {
+      await expectFullyVisible(page.getByRole('button', { name, exact: true }), name);
+    }
     await page.getByRole('button', { name: 'Start review' }).click();
+    await page.getByRole('tab', { name: /Notes/ }).waitFor();
+    await expectFullyVisible(page.getByRole('button', { name: 'Save note' }), 'Save note');
+    await expectFullyVisible(page.getByRole('tab', { name: /Timestamps/ }), 'Timestamps tab');
+    await expectFullyVisible(page.getByRole('toolbar', { name: 'Playback controls' }), 'Playback controls');
+    await resizeWindow(1440, 900);
 
     step('4. review: opens on the first focus point');
-    await page.getByRole('tab', { name: /Notes/ }).waitFor();
     await waitForPlayer();
     await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 3) < 0.05);
 
