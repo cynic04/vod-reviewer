@@ -90,6 +90,11 @@ erDiagram
         int stale_after_days "default 15"
         string player_character_id FK "null = not set"
         string summary_model "default claude-haiku-4.5"
+        string email_to "null until email is set up"
+        string email_from
+        string email_host
+        int email_port
+        boolean email_auto_send
     }
 ```
 
@@ -107,7 +112,12 @@ stored in `library.json`, but it would be a seeded lookup table in a database.
 | Review session | `sessions` | One sitting of note-taking on a video. Created with the first note written after opening the review screen. |
 | Note | `notes` | Free text pinned to a position in a video, written during a session. |
 | Session summary | `summaries` | The AI-written coaching summary of one session, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
-| Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, and the model that writes summaries. |
+| Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, the model that writes summaries, and the email account summaries are sent with (`email`, `null` until set up). |
+
+**What is deliberately not in this file:** the email account's password. It is stored
+encrypted by the operating system in `email-credentials.bin`, next to `library.json`, and
+would map to a secrets manager rather than a table. See
+[ADR 0011](decisions/0011-email-summaries.md).
 
 ## Rules the application enforces
 
@@ -144,13 +154,14 @@ folders falling under "Miscellaneous".
 
 ```json
 {
-  "schemaVersion": 2,
+  "schemaVersion": 3,
   "settings": {
     "theme": "dark",
     "videosRoot": null,
     "staleAfterDays": 15,
     "playerCharacterId": "mll",
-    "summaryModel": "claude-haiku-4.5"
+    "summaryModel": "claude-haiku-4.5",
+    "email": { "to": "me@example.com", "from": "me@example.com", "host": "smtp.gmail.com", "port": 465, "autoSend": true }
   },
   "folders": [
     { "id": "matchup-sol", "name": "Sol Badguy", "kind": "matchup", "characterId": "sol", "createdAt": "2026-11-14T09:00:00.000Z" },
@@ -272,7 +283,14 @@ CREATE TABLE settings (
   videos_root         TEXT,
   stale_after_days    INTEGER NOT NULL DEFAULT 15 CHECK (stale_after_days >= 1),
   player_character_id TEXT REFERENCES character (id),
-  summary_model       TEXT NOT NULL DEFAULT 'claude-haiku-4.5'
+  summary_model       TEXT NOT NULL DEFAULT 'claude-haiku-4.5',
+  -- Email account; all NULL until set up. The password lives in a secrets store, not here.
+  email_to            TEXT,
+  email_from          TEXT,
+  email_host          TEXT,
+  email_port          INTEGER CHECK (email_port BETWEEN 1 AND 65535),
+  email_auto_send     BOOLEAN,
+  CHECK ((email_to IS NULL) = (email_from IS NULL) AND (email_to IS NULL) = (email_host IS NULL))
 );
 ```
 
@@ -298,6 +316,7 @@ refused rather than guessed at.
 | Version | Change |
 | --- | --- |
 | 1 | Initial schema. |
-| 2 | Added `summaries`, `settings.playerCharacterId` and `settings.summaryModel`. | A file that cannot be parsed is **renamed**
+| 2 | Added `summaries`, `settings.playerCharacterId` and `settings.summaryModel`. |
+| 3 | Added `settings.email`. | A file that cannot be parsed is **renamed**
 (`library.unreadable-<timestamp>.json`), never overwritten, so a bad edit or a bug can
 not destroy notes.

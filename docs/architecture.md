@@ -47,6 +47,7 @@ src/
     ipc/             handlers + the router that guards them
     media/           the streaming protocol
     agent/           the summarize agent harness: MCP endpoint, tools, launcher, YouTube search
+    email/           summary emails: HTML content, SMTP sender, encrypted credential store
     videos/          directory browser, path safety
   preload/           The one bridge function exposed to the renderer
   renderer/src/      The React app
@@ -60,6 +61,7 @@ src/
       player/        the media player (hooks + components)
       annotations/   notes and timestamps
       session-notes/ AI summaries of review sessions, grouped by character
+      email/         email setup dialog and the "Email" button
       characters/    portraits and folder labels
     store/           library store, selectors, toasts
     lib/             small utilities
@@ -102,6 +104,8 @@ programs), and an unreadable file is set aside rather than overwritten.
 One kind of change does not start in the window: the summarize agent handing in a
 summary. For that the main process pushes the new snapshot to the renderer
 (`onLibraryChanged`), and the store replaces its copy exactly as it does after a request.
+Outcomes of background work that nobody is waiting on - a summary being emailed
+automatically, or failing to - arrive the same way as a `Notice` and are shown as a toast.
 
 ## The summarize agent
 
@@ -135,9 +139,29 @@ The renderer is treated as untrusted, the way a web page would be:
 - The agent endpoint listens on loopback only, serves each run at an unguessable URL,
   refuses browser-originated requests, and exposes nothing but that run's three tools.
 - Summaries are rendered from markdown to React elements; HTML inside them is not executed.
+  The same text is escaped again when it is put into an email.
+- The email password is entered in a password field, sent once to the main process, and
+  stored encrypted by the operating system. It is never written to `library.json`, never
+  returned to the renderer, and only transmitted to the mail server over TLS.
 - The renderer never receives `file://` access. Videos are served by the `vod-media://`
   protocol, which only resolves (a) videos that are in the library and (b) supported video
   files inside the configured videos folder. See [ADR 0003](decisions/0003-custom-media-protocol.md).
+
+## Emailing summaries
+
+`src/main/email` turns a finished summary into an HTML email and sends it over SMTP from
+an account the user connects in Settings.
+
+| Piece | Responsibility |
+| --- | --- |
+| `content.ts` | Pure: builds subject, HTML and plain text from the library. Markdown is rendered with inline styles; YouTube links become video cards. |
+| `mailer.ts` | Sends through nodemailer, always over TLS, and turns SMTP failures into messages a person can act on. |
+| `credentials.ts` | Stores the account password encrypted with the OS key store, outside the library. |
+| `service.ts` | Ties them together: configure, remove, send a test, send a summary. |
+| `portraits.ts` | Resolves a character's portrait file for the email header. |
+
+The agent harness calls back when a summary is saved; if automatic sending is on, the
+main process emails it then. See [ADR 0011](decisions/0011-email-summaries.md).
 
 ## The media player
 
@@ -180,8 +204,8 @@ See [ADR 0004](decisions/0004-frame-stepping-and-frame-rate-detection.md).
 
 | Layer | Tool | What it covers |
 | --- | --- | --- |
-| Domain rules, frame/time/zoom maths, range parsing, persistence | Vitest (`npm test`) | Pure logic and the JSON repository against a temp directory. |
-| The whole app | Playwright driving Electron (`npm run test:e2e`) | The real built app through the full workflow, against a generated test video and throwaway data. The test plays the summarize agent itself, so no AI credits are spent. |
+| Domain rules, frame/time/zoom maths, range parsing, persistence, the agent protocol and tools, email content and delivery | Vitest (`npm test`) | Pure logic, the JSON repository against a temp directory, and real SMTP delivery to a local test server. |
+| The whole app | Playwright driving Electron (`npm run test:e2e`) | The real built app through the full workflow, against a generated test video and throwaway data. The test plays the summarize agent itself, so no AI credits are spent, and runs its own mail server, so no real email is sent. |
 | Types and conventions | `npm run typecheck`, `npm run lint` | Strict TypeScript and type-aware ESLint, including the React Compiler-era hooks rules. |
 
 ## Decisions

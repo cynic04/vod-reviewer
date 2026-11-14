@@ -78,6 +78,13 @@ No fonts are bundled or downloaded; the app uses what Windows ships.
   body face at a 74-character measure with 1.65 line height; section headings keep the
   display face, pattern headings switch to bold body text with a red rule so that a
   summary reads as a document rather than as more UI.
+- **Hover on matchup cards.** The card lifts, the portrait regains its colour, and a red
+  frame fades in over a quarter of a second. The frame is an overlay drawn above the
+  caption, not a CSS outline, which the caption would cover.
+- **Email.** Summary emails use the same palette in a form mail clients accept: an ink
+  header with the red rule and the opponent's portrait, a bone-white body, ink video cards
+  with yellow calls to action. Fonts fall back to what phones have (Arial Black for
+  display, the system sans for text), and the layout is a single fluid column up to 640px.
 - **Time is always clickable.** Anywhere a timecode appears as a chip, clicking it seeks
   the video there.
 
