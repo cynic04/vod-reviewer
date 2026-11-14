@@ -1,0 +1,42 @@
+.stepper {
+  display: flex;
+  gap: var(--space-1);
+}
+
+.step {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 1;
+  min-width: 0;
+  height: 34px;
+  padding: 0 var(--space-5) 0 var(--space-4);
+  background: var(--color-surface);
+  color: var(--color-text-muted);
+  clip-path: polygon(var(--slant) 0, 100% 0, calc(100% - var(--slant)) 100%, 0 100%);
+}
+
+.number {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 20px;
+}
+
+.label {
+  overflow: hidden;
+  font-size: 13px;
+  letter-spacing: 0.08em;
+  text-overflow: ellipsis;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.done {
+  background: var(--color-surface-raised);
+  color: var(--color-text);
+}
+
+.current {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}

@@ -1,0 +1,209 @@
+.page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-7);
+  max-width: 1500px;
+  margin: 0 auto;
+  padding: var(--space-6) var(--space-6) var(--space-7);
+}
+
+.hero {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-4);
+  padding: var(--space-7) var(--space-7) var(--space-7) calc(var(--space-7) + var(--space-3));
+  overflow: hidden;
+  background:
+    linear-gradient(105deg, var(--ink-950) 0 58%, transparent 58%),
+    repeating-linear-gradient(105deg, var(--red-600) 0 22px, var(--red-700) 22px 44px);
+  color: #f4f1ea;
+}
+
+.hero::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: var(--space-3);
+  background: var(--red-500);
+}
+
+.kicker {
+  font-size: 13px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: var(--yellow-400);
+}
+
+.hero h1 {
+  font-size: clamp(56px, 8vw, 104px);
+  line-height: 0.9;
+}
+
+.hero h1 em {
+  color: var(--red-500);
+}
+
+.lead {
+  max-width: 44ch;
+  font-size: 17px;
+  color: #c9c4b9;
+}
+
+.sectionHeader {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-4);
+  margin-bottom: var(--space-4);
+  padding-bottom: var(--space-2);
+  border-bottom: 3px solid var(--color-text);
+}
+
+.sectionHeader h2 {
+  font-size: 34px;
+}
+
+.sectionHeader p {
+  flex: 1;
+  color: var(--color-text-muted);
+}
+
+.sectionHeader button {
+  align-self: center;
+}
+
+.matchups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: var(--space-3);
+}
+
+.matchupCard {
+  position: relative;
+  display: block;
+  overflow: hidden;
+  background: var(--ink-900);
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition:
+    transform var(--duration-fast) var(--easing),
+    outline-color var(--duration-fast) var(--easing);
+}
+
+.matchupCard:hover,
+.matchupCard:focus-visible {
+  outline-color: var(--color-accent);
+  transform: translateY(-3px);
+}
+
+.portrait img {
+  transition:
+    filter var(--duration-fast) var(--easing),
+    transform 300ms var(--easing);
+}
+
+.matchupCard:hover .portrait img {
+  transform: scale(1.06);
+}
+
+/* Matchups without footage step back so the ones you have studied stand out. */
+.unused .portrait img {
+  filter: grayscale(1) brightness(0.55);
+}
+
+.unused:hover .portrait img {
+  filter: none;
+}
+
+.countBadge {
+  position: absolute;
+  top: 0;
+  right: 0;
+  min-width: 34px;
+  padding: 2px var(--space-2) 2px var(--space-3);
+  background: var(--red-500);
+  color: #fff;
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 20px;
+  text-align: center;
+  clip-path: polygon(10px 0, 100% 0, 100% 100%, 0 100%);
+}
+
+.caption {
+  position: absolute;
+  inset: auto 0 0;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: baseline;
+  column-gap: var(--space-2);
+  padding: var(--space-6) var(--space-3) var(--space-2);
+  background: linear-gradient(transparent, var(--portrait-fade) 62%);
+  color: #fff;
+}
+
+.versus {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 15px;
+  text-transform: uppercase;
+  color: var(--red-400);
+}
+
+.characterName {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 19px;
+  letter-spacing: 0.03em;
+  line-height: 1.05;
+  text-transform: uppercase;
+}
+
+.meta {
+  grid-column: 1 / -1;
+  min-height: 20px;
+  font-size: 12px;
+  color: #c9c4b9;
+}
+
+.meta time {
+  color: #c9c4b9;
+}
+
+.noFolders {
+  color: var(--color-text-muted);
+}
+
+.folders {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--space-3);
+}
+
+.folderCard {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border-left: 4px solid var(--color-accent);
+  transition: background-color var(--duration-fast) var(--easing);
+}
+
+.folderCard:hover {
+  background: var(--color-surface-raised);
+}
+
+.folderName {
+  flex: 1;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.count {
+  font-family: var(--font-mono);
+  color: var(--color-text-muted);
+}

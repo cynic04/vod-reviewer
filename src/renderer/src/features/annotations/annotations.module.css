@@ -1,0 +1,154 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  min-height: 0;
+}
+
+.empty {
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.item {
+  background: var(--color-surface);
+  border-left: 3px solid var(--color-border);
+  transition:
+    border-color var(--duration-fast) var(--easing),
+    background-color var(--duration-fast) var(--easing);
+}
+
+.item.active {
+  border-left-color: var(--color-accent);
+  background: var(--color-surface-raised);
+}
+
+.timestampItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-1) var(--space-2);
+}
+
+.timeChip {
+  flex: none;
+  padding: 3px var(--space-2);
+  border: 0;
+  background: var(--color-text);
+  color: var(--color-bg);
+  font-family: var(--font-mono);
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+  transition: background-color var(--duration-fast) var(--easing);
+}
+
+.timeChip:hover {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.focusChip {
+  background: var(--color-highlight);
+  color: var(--color-stale-text);
+}
+
+.labelInput[type='text'] {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-1) var(--space-2);
+  background: transparent;
+  border-color: transparent;
+}
+
+.labelInput[type='text']:hover,
+.labelInput[type='text']:focus {
+  background: var(--color-bg);
+  border-color: var(--color-border);
+}
+
+.composer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.composer button {
+  align-self: stretch;
+}
+
+.noteComposer {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.composerLabel {
+  font-size: 12px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+}
+
+.mono {
+  font-family: var(--font-mono);
+  color: var(--color-highlight-text);
+  letter-spacing: 0;
+}
+
+.composerActions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: var(--space-3);
+}
+
+.hint {
+  margin-right: auto;
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.noteItem {
+  padding: var(--space-2) var(--space-2) var(--space-3) var(--space-3);
+}
+
+.noteHeader {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 34px;
+}
+
+.session {
+  flex: 1;
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--color-text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.currentSession {
+  color: var(--color-accent-text);
+}
+
+.noteBody {
+  margin-top: var(--space-1);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.noteEditor {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}

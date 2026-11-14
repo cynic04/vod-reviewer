@@ -1,0 +1,66 @@
+.help {
+  position: relative;
+}
+
+.help summary {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: 34px;
+  padding: 0 var(--space-3);
+  font-size: 13px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--color-text-muted);
+  list-style: none;
+  cursor: pointer;
+  user-select: none;
+}
+
+.help summary::-webkit-details-marker {
+  display: none;
+}
+
+.help summary:hover,
+.help[open] summary {
+  color: var(--color-text);
+}
+
+.list {
+  position: absolute;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  z-index: 20;
+  display: grid;
+  gap: var(--space-2);
+  width: 340px;
+  margin: 0;
+  padding: var(--space-4);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-top: 3px solid var(--color-accent);
+  box-shadow: var(--shadow-raised);
+}
+
+.list div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-4);
+  font-size: 13px;
+}
+
+.list dd {
+  margin: 0;
+  color: var(--color-text-muted);
+  text-align: right;
+}
+
+.list kbd {
+  padding: 1px var(--space-2);
+  background: var(--color-surface-raised);
+  border-bottom: 2px solid var(--color-border);
+  font-family: var(--font-mono);
+  font-size: 12px;
+  white-space: nowrap;
+}

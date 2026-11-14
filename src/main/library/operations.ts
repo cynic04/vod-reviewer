@@ -1,16 +1,6 @@
 import { CHARACTERS, matchupFolderId } from '@shared/domain/characters';
-import {
-  DEFAULT_FRAME_RATE,
-  DEFAULT_STALE_AFTER_DAYS,
-  LIBRARY_SCHEMA_VERSION,
-  type Folder,
-  type Library,
-  type Note,
-  type ReviewSession,
-  type Settings,
-  type Timestamp,
-  type Video,
-} from '@shared/domain/schema';
+import { DEFAULT_FRAME_RATE, DEFAULT_STALE_AFTER_DAYS, LIBRARY_SCHEMA_VERSION } from '@shared/domain/constants';
+import type { Folder, Library, Note, ReviewSession, Settings, Timestamp, Video } from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { pathKey } from '../videos/paths';
 import { DomainError, notFound } from './errors';
