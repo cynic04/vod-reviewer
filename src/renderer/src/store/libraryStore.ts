@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Library, Note, Timestamp, Video } from '@shared/domain/schema';
+import type { Library, Note, SessionSummary, Timestamp, Video } from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { errorMessage, invoke } from '@renderer/lib/api';
 
@@ -34,7 +34,14 @@ interface LibraryState {
   createNote: (request: IpcRequest<'notes:create'>) => Promise<Note>;
   updateNote: (id: string, body: string) => Promise<void>;
   removeNote: (id: string) => Promise<void>;
+
+  /** Starts the summarize agent for a session; the summary arrives later as a pushed update. */
+  requestSummary: (sessionId: string) => Promise<SessionSummary>;
+  /** Cancels a pending summary or deletes a finished one. */
+  removeSummary: (id: string) => Promise<void>;
 }
+
+let isSubscribedToPushes = false;
 
 export const useLibraryStore = create<LibraryState>((set) => {
   const replace = (library: Library): void => set({ library });
@@ -45,6 +52,11 @@ export const useLibraryStore = create<LibraryState>((set) => {
 
     load: async () => {
       set({ loadError: null });
+      if (!isSubscribedToPushes) {
+        // Changes that did not start in this window, such as the agent saving a summary.
+        window.vodReviewer.onLibraryChanged(replace);
+        isSubscribedToPushes = true;
+      }
       try {
         set({ library: await invoke('library:get') });
       } catch (error) {
@@ -88,5 +100,12 @@ export const useLibraryStore = create<LibraryState>((set) => {
     },
     updateNote: async (id, body) => replace(await invoke('notes:update', { id, body })),
     removeNote: async (id) => replace(await invoke('notes:remove', { id })),
+
+    requestSummary: async (sessionId) => {
+      const { library, summary } = await invoke('summaries:request', { sessionId });
+      replace(library);
+      return summary;
+    },
+    removeSummary: async (id) => replace(await invoke('summaries:remove', { id })),
   };
 });

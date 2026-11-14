@@ -13,7 +13,14 @@ import { usePlayerShortcuts, type ShortcutMap } from '@renderer/features/player/
 import { useVideoWorkspace } from '@renderer/features/player/useVideoWorkspace';
 import { useLibrary } from '@renderer/store/hooks';
 import { useLibraryStore } from '@renderer/store/libraryStore';
-import { selectFolder, selectNotes, selectSessionsById, selectTimestamps, selectVideo } from '@renderer/store/selectors';
+import {
+  selectFolder,
+  selectNotes,
+  selectSessionsById,
+  selectSummaryForSession,
+  selectTimestamps,
+  selectVideo,
+} from '@renderer/store/selectors';
 import { reportError } from '@renderer/store/toastStore';
 import { ShortcutHelp } from './ShortcutHelp';
 import { WorkspaceLayout } from './WorkspaceLayout';
@@ -115,11 +122,14 @@ function ReviewWorkspace({ video }: { video: Video }) {
             <NotesPanel
               videoId={video.id}
               notes={notes}
+              timestamps={timestamps}
               sessions={sessions}
               currentSessionId={currentSessionId}
               onSessionStarted={setStartedSessionId}
               player={player}
               focusRequest={noteFocusRequest}
+              summary={selectSummaryForSession(library, currentSessionId)}
+              sessionNotesHref={routes.sessionNotes(video.folderId)}
             />
           </div>
 

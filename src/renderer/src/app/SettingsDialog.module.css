@@ -64,6 +64,11 @@
   gap: var(--space-3);
 }
 
+.field > select,
+.field > input[type='text'] {
+  width: 100%;
+}
+
 .inline input[type='number'] {
   width: 96px;
 }

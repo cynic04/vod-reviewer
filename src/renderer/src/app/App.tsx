@@ -7,6 +7,7 @@ import { ImportPage } from '@renderer/features/import/ImportPage';
 import { FolderPage } from '@renderer/features/library/FolderPage';
 import { LibraryPage } from '@renderer/features/library/LibraryPage';
 import { ReviewPage } from '@renderer/features/review/ReviewPage';
+import { SessionNotesPage } from '@renderer/features/session-notes/SessionNotesPage';
 import { useLibraryStore } from '@renderer/store/libraryStore';
 import { AppLayout } from './AppLayout';
 import { ErrorBoundary } from './ErrorBoundary';
@@ -54,6 +55,8 @@ export function App() {
               <Route path={ROUTE_PATTERNS.import} element={<ImportPage />} />
               <Route path={ROUTE_PATTERNS.focus} element={<FocusPage />} />
               <Route path={ROUTE_PATTERNS.review} element={<ReviewPage />} />
+              <Route path={ROUTE_PATTERNS.sessionNotes} element={<SessionNotesPage />} />
+              <Route path={ROUTE_PATTERNS.folderSessionNotes} element={<SessionNotesPage />} />
               <Route path="*" element={<Navigate to={routes.library()} replace />} />
             </Route>
           </Routes>

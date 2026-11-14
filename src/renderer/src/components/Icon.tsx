@@ -29,9 +29,13 @@ const ICON_PATHS = {
   arrowRight: 'M13 5l7 7-7 7M20 12H4',
   arrowUp: 'M5 11l7-7 7 7M12 4v16',
   check: 'M4.5 12.5l5 5 10-11',
+  chevronDown: 'M6 9l6 6 6-6',
   external: 'M14 4h6v6M20 4l-9 9M18 14v6H4V6h6',
   clock: 'M12 3.5a8.5 8.5 0 1 0 0 17 8.5 8.5 0 0 0 0-17zM12 7.5V12l3 2',
   keyboard: 'M3 6h18v12H3zM7 10h.01M11 10h.01M15 10h.01M7 14h10',
+  sparkle:
+    'M11 3l1.9 5.6L18.5 10.5l-5.6 1.9L11 18l-1.9-5.6L3.5 10.5l5.6-1.9zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
+  notebook: 'M6 3.5h12v17H6zM9.5 3.5v17M12.5 8h3M12.5 11.5h3',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
