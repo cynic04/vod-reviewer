@@ -39,6 +39,8 @@
   --topbar-height: 56px;
 
   --duration-fast: 120ms;
+  /* Slow enough to read as a fade rather than a switch. */
+  --duration-frame-fade: 260ms;
   --easing: cubic-bezier(0.2, 0.8, 0.2, 1);
 
   /* The stale highlight is the same in both themes: Strive's yellow with ink text. */
