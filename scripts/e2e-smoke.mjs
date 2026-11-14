@@ -18,7 +18,9 @@ import { execFileSync } from 'node:child_process';
 import { mkdir, readdir, readFile, rm, utimes } from 'node:fs/promises';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
+import { simpleParser } from 'mailparser';
 import { _electron as electron } from 'playwright-core';
+import { SMTPServer } from 'smtp-server';
 
 const ROOT = path.resolve(import.meta.dirname, '..');
 const WORK_DIR = path.join(ROOT, '.e2e');
@@ -49,6 +51,33 @@ async function prepareFixtures() {
   await utimes(samplePath, recordedAt, recordedAt);
 }
 
+/** A local mail server standing in for Gmail: accepts one account and hands back what it receives. */
+async function startMailServer() {
+  const inbox = [];
+  const waiting = [];
+  const server = new SMTPServer({
+    disabledCommands: ['STARTTLS'],
+    onAuth: (auth, _session, callback) =>
+      auth.username === 'sender@example.com' && auth.password === 'e2e-app-password'
+        ? callback(null, { user: 'e2e' })
+        : callback(new Error('Invalid login')),
+    onData: (stream, _session, callback) => {
+      simpleParser(stream).then((mail) => {
+        const waiter = waiting.shift();
+        if (waiter) waiter(mail);
+        else inbox.push(mail);
+        callback();
+      }, callback);
+    },
+  });
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  return {
+    port: server.server.address().port,
+    nextMail: () => (inbox.length > 0 ? Promise.resolve(inbox.shift()) : new Promise((resolve) => waiting.push(resolve))),
+    close: () => new Promise((resolve) => server.close(resolve)),
+  };
+}
+
 const readLibrary = async () => JSON.parse(await readFile(path.join(USER_DATA_DIR, 'library.json'), 'utf8'));
 
 async function main() {
@@ -57,6 +86,8 @@ async function main() {
   // Set VOD_REVIEWER_E2E_EXECUTABLE to test a packaged build, e.g.
   // "dist/win-unpacked/VOD Reviewer.exe", instead of the app in this repository.
   const packagedExecutable = process.env.VOD_REVIEWER_E2E_EXECUTABLE;
+  // A packaged build refuses mail servers without TLS, so email is only exercised unpackaged.
+  const mailServer = packagedExecutable ? null : await startMailServer();
   const app = await electron.launch({
     ...(packagedExecutable ? { executablePath: path.resolve(packagedExecutable), args: [] } : { args: [ROOT] }),
     env: {
@@ -65,6 +96,7 @@ async function main() {
       VOD_REVIEWER_VIDEOS_ROOT: VIDEOS_DIR,
       // The app prepares summarize runs but starts no Copilot CLI; this test plays the agent.
       VOD_REVIEWER_AGENT_DRY_RUN: '1',
+      VOD_REVIEWER_SMTP_ALLOW_INSECURE: '1',
     },
   });
 
@@ -205,6 +237,30 @@ async function main() {
     assert.ok(Math.abs(withNote.notes[0].timeSeconds - noteTime) < 0.001, 'note pinned to the playhead');
     assert.equal(withNote.notes[0].sessionId, withNote.sessions[0].id, 'note belongs to the session');
 
+    if (mailServer) {
+      step('   email: connect an account and receive the test message');
+      await page.getByRole('button', { name: 'Settings' }).click();
+      await page.getByRole('button', { name: 'Set up' }).click();
+      const setup = page.getByRole('dialog', { name: 'Email setup' });
+      assert.equal(await setup.getByLabel('Send summaries to').inputValue(), 'firegate0@gmail.com', 'recipient is prefilled');
+      await setup.getByLabel('Send summaries to').fill('me@example.com');
+      await setup.getByLabel('Sending account').selectOption('other');
+      await setup.getByLabel('Account address').fill('sender@example.com');
+      await setup.getByLabel('SMTP server').fill('127.0.0.1');
+      await setup.getByLabel('Port').fill(String(mailServer.port));
+      await setup.getByLabel('Password').fill('e2e-app-password');
+      await screenshot('04a-email-setup');
+      await setup.getByRole('button', { name: 'Save and send test' }).click();
+      await setup.getByText('A test email is on its way to me@example.com').waitFor();
+      assert.equal((await mailServer.nextMail()).subject, 'VOD Reviewer: email is set up');
+      await setup.getByRole('button', { name: 'Close' }).click();
+      await page.getByText('Summaries go to me@example.com').waitFor();
+      await page.getByRole('button', { name: 'Done' }).click();
+      const stored = await readFile(path.join(USER_DATA_DIR, 'library.json'), 'utf8');
+      assert.ok(!stored.includes('e2e-app-password'), 'the password is not in the library file');
+      assert.ok(!(await readFile(path.join(USER_DATA_DIR, 'email-credentials.bin'))).includes('e2e-app-password'), 'the stored password is encrypted');
+    }
+
     step('   summarize: the harness briefs the agent and shows the summary it hands in');
     await page.getByRole('button', { name: 'Summarize', exact: true }).click();
     await page.getByText('Copilot is summarizing this session').waitFor();
@@ -234,8 +290,22 @@ async function main() {
     assert.equal(brief.matchup.opponent, 'Sol Badguy');
     assert.equal(brief.notes[0].text, 'Dropped the combo after 6P - practise the route');
     await callTool('save_summary', {
-      markdown: '## Overview\n\nYou drop the 6P route under pressure.\n\n## Study material\n\n- [Combo guide](https://www.youtube.com/watch?v=abc) - the route.\n\n<script>window.pwned = true</script>',
+      markdown: '## Overview\n\nYou drop the 6P route under pressure.\n\n## Study material\n\n- [Combo guide](https://www.youtube.com/watch?v=e2eVideo001) - the route.\n\n<script>window.pwned = true</script>',
     });
+    if (mailServer) {
+      // Saving a summary emails it without anyone asking.
+      const automatic = await mailServer.nextMail();
+      assert.match(automatic.subject, /^VOD review: vs\. Sol Badguy - ranked-set \(/);
+      assert.equal(automatic.to.text, 'me@example.com');
+      assert.match(automatic.html, /Overview<\/h2>/);
+      assert.match(automatic.html, /Dropped the combo after 6P - practise the route/, 'the notes are included');
+      assert.match(automatic.html, /i\.ytimg\.com\/vi\/e2eVideo001\/mqdefault\.jpg/, 'linked videos become cards');
+      assert.ok(!automatic.html.includes('<script>'), 'HTML in a summary is not sent as HTML');
+      assert.equal(automatic.attachments[0]?.contentId, '<portrait@vod-reviewer>', 'the character portrait is embedded');
+      assert.ok(automatic.attachments[0].size > 10_000);
+      await page.getByText('Summary emailed to me@example.com.').waitFor();
+    }
+
     // The agent's save reaches the open window without any request from it.
     await page.getByRole('link', { name: 'View summary' }).click();
     await page.getByRole('heading', { name: 'Session notes', level: 1 }).waitFor();
@@ -244,6 +314,10 @@ async function main() {
     assert.equal(await studyLink.getAttribute('target'), '_blank', 'links open outside the app');
     assert.equal(await page.evaluate(() => window.pwned), undefined, 'HTML in a summary is not executed');
     await screenshot('05a-session-notes');
+    if (mailServer) {
+      await page.getByRole('button', { name: 'Email', exact: true }).click();
+      assert.match((await mailServer.nextMail()).text, /## Overview/, 'sent on request, with a plain-text alternative');
+    }
     await page.getByRole('link', { name: 'Session notes', exact: true }).click();
     await page.getByRole('heading', { name: 'vs. Sol Badguy', level: 2 }).waitFor();
     await page.getByRole('link', { name: 'ranked-set', exact: true }).click();
@@ -372,6 +446,7 @@ async function main() {
     console.log('\nSmoke test passed.');
   } finally {
     await app.close();
+    await mailServer?.close();
   }
 }
 
