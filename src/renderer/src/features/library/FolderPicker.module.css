@@ -1,0 +1,97 @@
+.picker {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.groups {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+}
+
+.matchups {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: var(--space-2);
+}
+
+.matchup {
+  position: relative;
+  display: block;
+  padding: 0;
+  border: 0;
+  background: var(--ink-900);
+  outline: 3px solid transparent;
+  outline-offset: -3px;
+  transition: outline-color var(--duration-fast) var(--easing);
+}
+
+.matchup img {
+  filter: saturate(0.55) brightness(0.8);
+  transition: filter var(--duration-fast) var(--easing);
+}
+
+.matchup:hover img,
+.matchup.selected img {
+  filter: none;
+}
+
+.matchup .name {
+  position: absolute;
+  inset: auto 0 0;
+  padding: var(--space-4) var(--space-2) var(--space-1);
+  background: linear-gradient(transparent, var(--portrait-fade) 70%);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.15;
+  text-align: left;
+}
+
+.matchup.selected {
+  outline-color: var(--color-highlight);
+}
+
+.matchup.selected .name {
+  background: var(--color-highlight);
+  color: var(--color-stale-text);
+  padding-top: var(--space-1);
+}
+
+.matchup:focus-visible {
+  outline-color: var(--color-focus-ring);
+}
+
+.custom h3 {
+  margin-bottom: var(--space-2);
+  font-size: 16px;
+  color: var(--color-text-muted);
+}
+
+.customList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.customOption {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  background: var(--color-surface);
+}
+
+.customOption:hover {
+  border-color: var(--color-text-muted);
+}
+
+.customOption.selected {
+  border-color: var(--color-highlight);
+  background: var(--color-highlight);
+  color: var(--color-stale-text);
+  font-weight: 600;
+}
+
+.noMatch {
+  color: var(--color-text-muted);
+}
