@@ -34,4 +34,9 @@ export default tseslint.config(
     files: ['scripts/**/*.mjs', 'eslint.config.js'],
     ...tseslint.configs.disableTypeChecked,
   },
+  {
+    // Playwright callbacks in the smoke test are serialised and run inside the page.
+    files: ['scripts/e2e-smoke.mjs'],
+    languageOptions: { globals: globals.browser },
+  },
 );
