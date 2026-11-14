@@ -1,6 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import path from 'node:path';
 import { app, BrowserWindow, dialog, shell } from 'electron';
+import { LIBRARY_CHANGED_CHANNEL } from '@shared/ipc/transport';
+import { AgentHarness } from './agent/harness';
+import { assertAgentAvailable, openTerminal } from './agent/platform';
+import { searchYouTube } from './agent/youtube';
 import { createIpcHandlers } from './ipc/handlers';
 import { registerIpcRouter } from './ipc/router';
 import { JsonLibraryRepository } from './library/repository';
@@ -12,8 +16,10 @@ import { createMainWindow, isAppUrl } from './window';
  * Optional overrides, used by the end-to-end smoke test to run against throwaway data:
  *   VOD_REVIEWER_USER_DATA    where library.json is stored
  *   VOD_REVIEWER_VIDEOS_ROOT  default folder of the import browser
+ *   VOD_REVIEWER_AGENT_DRY_RUN  prepare summarize runs without starting the Copilot CLI
  */
 const userDataOverride = process.env.VOD_REVIEWER_USER_DATA;
+const isAgentDryRun = process.env.VOD_REVIEWER_AGENT_DRY_RUN === '1';
 
 // Electron derives the data folder from the app's display name, which differs between a
 // development run ("vod-reviewer") and the packaged app ("VOD Reviewer"). Pin it, so both
@@ -41,6 +47,23 @@ async function bootstrap(): Promise<void> {
 
   handleMediaRequests({ getLibrary: () => library.library, getVideosRoot });
 
+  const agent = new AgentHarness({
+    library,
+    workspaceDir: path.join(app.getPath('userData'), 'agent'),
+    appVersion: app.getVersion(),
+    // The dry run prepares everything but opens no terminal, so tests can play the agent.
+    assertAgentAvailable: isAgentDryRun ? () => Promise.resolve() : assertAgentAvailable,
+    openTerminal: isAgentDryRun ? () => Promise.resolve() : openTerminal,
+    searchYouTube,
+    onLibraryChanged: (snapshot) => {
+      for (const window of BrowserWindow.getAllWindows()) {
+        window.webContents.send(LIBRARY_CHANGED_CHANNEL, snapshot);
+      }
+    },
+  });
+  await agent.start();
+  app.on('will-quit', () => agent.stop());
+
   registerIpcRouter(
     createIpcHandlers({
       library,
@@ -54,6 +77,7 @@ async function bootstrap(): Promise<void> {
         return result.canceled ? null : (result.filePaths[0] ?? null);
       },
       showItemInFolder: (filePath) => shell.showItemInFolder(filePath),
+      agent,
     }),
     (event) => event.senderFrame !== null && isAppUrl(event.senderFrame.url),
   );

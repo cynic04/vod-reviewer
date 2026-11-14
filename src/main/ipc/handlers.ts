@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import path from 'node:path';
 import type { IpcChannel, IpcRequest, IpcResponse } from '@shared/ipc/contract';
+import type { AgentHarness } from '../agent/harness';
 import { DomainError, notFound } from '../library/errors';
 import * as operations from '../library/operations';
 import type { LibraryService } from '../library/service';
@@ -18,6 +19,7 @@ export interface IpcHandlerDependencies {
   /** Opens the OS folder picker. Resolves to `null` when dismissed. */
   chooseDirectory: (defaultPath: string) => Promise<string | null>;
   showItemInFolder: (filePath: string) => void;
+  agent: Pick<AgentHarness, 'requestSummary' | 'removeSummary'>;
 }
 
 export function createIpcHandlers(deps: IpcHandlerDependencies): IpcHandlers {
@@ -105,5 +107,9 @@ export function createIpcHandlers(deps: IpcHandlerDependencies): IpcHandlers {
       library.update((current) => operations.updateNote(current, id, body, ctx)),
 
     'notes:remove': ({ id }) => library.update((current) => operations.removeNote(current, id)),
+
+    'summaries:request': ({ sessionId }) => deps.agent.requestSummary(sessionId),
+
+    'summaries:remove': ({ id }) => deps.agent.removeSummary(id),
   };
 }
