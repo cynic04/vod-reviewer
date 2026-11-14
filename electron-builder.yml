@@ -1,0 +1,34 @@
+# Packaging configuration for `npm run package`. See docs/decisions/0009-packaging.md.
+appId: com.cynic04.vodreviewer
+productName: VOD Reviewer
+copyright: Fan-made tool. Guilty Gear -Strive- (c) ARC SYSTEM WORKS.
+
+directories:
+  output: dist
+  buildResources: build
+
+# Only the built app is shipped. The renderer is fully bundled by Vite, so the only
+# node_modules that end up in the package are the main process's runtime dependencies.
+files:
+  - out/**/*
+  - package.json
+
+win:
+  icon: build/icon.ico
+  target:
+    - target: nsis
+      arch: x64
+
+nsis:
+  # A per-user, one-click install: no administrator prompt.
+  oneClick: true
+  perMachine: false
+  artifactName: VOD-Reviewer-Setup-${version}.${ext}
+  shortcutName: VOD Reviewer
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  # Uninstalling keeps %APPDATA%\vod-reviewer, i.e. your notes.
+  deleteAppDataOnUninstall: false
+
+# No auto-update server exists for this app.
+publish: null

@@ -1,5 +1,6 @@
 import { fileURLToPath } from 'node:url';
 import { BrowserWindow, shell } from 'electron';
+import iconPath from '../../resources/icon.png?asset';
 
 const PRELOAD_PATH = fileURLToPath(new URL('../preload/index.cjs', import.meta.url));
 const RENDERER_INDEX_PATH = fileURLToPath(new URL('../renderer/index.html', import.meta.url));
@@ -28,6 +29,7 @@ export function createMainWindow(): BrowserWindow {
     autoHideMenuBar: true,
     backgroundColor: '#0e0e10',
     title: 'VOD Reviewer',
+    icon: iconPath,
     webPreferences: {
       preload: PRELOAD_PATH,
       contextIsolation: true,

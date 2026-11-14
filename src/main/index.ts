@@ -14,7 +14,18 @@ import { createMainWindow, isAppUrl } from './window';
  *   VOD_REVIEWER_VIDEOS_ROOT  default folder of the import browser
  */
 const userDataOverride = process.env.VOD_REVIEWER_USER_DATA;
-if (userDataOverride) app.setPath('userData', path.resolve(userDataOverride));
+
+// Electron derives the data folder from the app's display name, which differs between a
+// development run ("vod-reviewer") and the packaged app ("VOD Reviewer"). Pin it, so both
+// - and every future version - share one library.
+app.setPath(
+  'userData',
+  userDataOverride ? path.resolve(userDataOverride) : path.join(app.getPath('appData'), 'vod-reviewer'),
+);
+
+// Must match `appId` in electron-builder.yml, or Windows will not group the running
+// window with its pinned taskbar shortcut.
+app.setAppUserModelId('com.cynic04.vodreviewer');
 
 registerMediaScheme();
 
