@@ -168,14 +168,32 @@ async function main() {
     await page.getByRole('button', { name: /^Jump to 0:06/ }).click();
     await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 6) < 0.05);
 
+    step('   the scrubber seeks and the picture toggles playback');
+    const stage = page.getByRole('region', { name: 'Video player' });
+    const slider = page.getByRole('slider', { name: 'Seek' });
+    const sliderBox = await slider.boundingBox();
+    await page.mouse.click(sliderBox.x + sliderBox.width / 4, sliderBox.y + sliderBox.height / 2);
+    await page.waitForFunction(() => Math.abs(document.querySelector('video').currentTime - 2) < 0.1);
+    await stage.click({ position: { x: 300, y: 200 } });
+    await page.waitForFunction(() => !document.querySelector('video').paused);
+    await stage.click({ position: { x: 300, y: 200 } });
+    await page.waitForFunction(() => document.querySelector('video').paused);
+
     step('   zoom in, out and reset');
     const zoomLevel = page.getByLabel('Zoom level');
     await page.keyboard.press('+');
     await page.keyboard.press('+');
     assert.equal(await zoomLevel.textContent(), '156%');
-    await page.getByRole('region', { name: 'Video player' }).hover({ position: { x: 200, y: 150 } });
+    await stage.hover({ position: { x: 200, y: 150 } });
     await page.mouse.wheel(0, -600);
     assert.notEqual(await zoomLevel.textContent(), '156%', 'wheel zooms');
+    const pictureTransform = () => page.evaluate(() => document.querySelector('video').parentElement.style.transform);
+    const beforePan = await pictureTransform();
+    await page.mouse.down();
+    await page.mouse.move(420, 330, { steps: 4 });
+    await page.mouse.up();
+    assert.notEqual(await pictureTransform(), beforePan, 'dragging pans the zoomed picture');
+    assert.ok(await page.evaluate(() => document.querySelector('video').paused), 'a drag is not a click');
     await page.getByRole('tab', { name: /Notes/ }).click();
     await screenshot('05-review-zoomed');
     await page.keyboard.press('0');
@@ -208,6 +226,43 @@ async function main() {
     assert.ok(Math.abs(library.videos[0].durationSeconds - 8) < 0.2, 'duration recorded');
     assert.deepEqual(library.timestamps.map((t) => t.kind).sort(), ['bookmark', 'focus']);
     assert.equal(library.settings.theme, 'dark');
+
+    step('7. settings: raising the threshold clears the "old video" highlight');
+    await page.getByRole('button', { name: 'Settings' }).click();
+    const threshold = page.getByRole('spinbutton', { name: 'Highlight videos older than' });
+    await threshold.fill('30');
+    await threshold.press('Enter');
+    await expectLibrary((l) => l.settings.staleAfterDays === 30, 'stale threshold');
+    await screenshot('11-settings');
+    await page.getByRole('button', { name: 'Done' }).click();
+    await page.getByRole('link', { name: 'vs. Sol Badguy, 1 video' }).click();
+    await page.getByText(`${SAMPLE_AGE_DAYS} days ago`).waitFor();
+    assert.equal(await page.getByText('Old video:').count(), 0, 'no longer flagged');
+
+    step('8. folders: create a custom folder and move the video into it');
+    await page.getByRole('link', { name: 'All matchups' }).click();
+    await page.getByRole('button', { name: 'New folder' }).click();
+    await page.getByRole('textbox', { name: 'Folder name' }).fill('Tournament sets');
+    await page.getByRole('button', { name: 'Create folder' }).click();
+    await page.getByRole('link', { name: /Tournament sets/ }).waitFor();
+    await page.getByRole('link', { name: 'vs. Sol Badguy, 1 video' }).click();
+    await page.getByRole('button', { name: 'Rename or move' }).click();
+    await page.getByRole('textbox', { name: 'Title' }).fill('Grand finals');
+    await page.getByRole('radio', { name: 'Tournament sets' }).click();
+    await screenshot('12-edit-video');
+    await page.getByRole('button', { name: 'Save' }).click();
+    await page.getByRole('heading', { name: 'No videos here yet' }).waitFor();
+    const moved = await expectLibrary((l) => l.videos[0].title === 'Grand finals', 'renamed video');
+    assert.equal(moved.folders.find((f) => f.id === moved.videos[0].folderId).name, 'Tournament sets');
+
+    step('9. removing a video deletes its notes and timestamps, never the file');
+    await page.getByRole('link', { name: 'All matchups' }).click();
+    await page.getByRole('link', { name: /Tournament sets/ }).click();
+    await page.getByRole('button', { name: 'Remove from library' }).click();
+    await page.getByRole('button', { name: 'Remove video' }).click();
+    const emptied = await expectLibrary((l) => l.videos.length === 0, 'video removed');
+    assert.deepEqual([emptied.notes, emptied.timestamps, emptied.sessions], [[], [], []]);
+    await readFile(path.join(VIDEOS_DIR, SAMPLE_NAME));
 
     assert.deepEqual(errors, [], 'no errors were logged by the renderer');
     console.log('\nSmoke test passed.');
