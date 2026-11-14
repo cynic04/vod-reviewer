@@ -1,0 +1,72 @@
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  flex: none;
+  align-items: center;
+  gap: var(--space-6);
+  height: var(--topbar-height);
+  padding: 0 var(--space-5);
+  background: var(--ink-950);
+  border-bottom: 3px solid var(--red-500);
+  color: #f4f1ea;
+}
+
+/* The top bar is ink in both themes, so its controls use fixed light-on-dark colours. */
+.topbar :global(button):not(:disabled) {
+  --color-text-muted: #a8a399;
+  --color-text: #f4f1ea;
+  --color-surface-raised: var(--ink-700);
+}
+
+.brand {
+  font-family: var(--font-display);
+  font-style: italic;
+  font-size: 26px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.brand span {
+  margin: 0 3px;
+  color: var(--red-500);
+}
+
+.navLink {
+  display: inline-flex;
+  align-items: center;
+  height: var(--topbar-height);
+  padding: 0 var(--space-2);
+  border-bottom: 3px solid transparent;
+  color: #a8a399;
+  font-size: 13px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  transition: color var(--duration-fast) var(--easing);
+}
+
+.navLink:hover,
+.navLinkActive {
+  color: #f4f1ea;
+}
+
+.navLinkActive {
+  border-bottom-color: var(--yellow-500);
+}
+
+.tools {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+.main {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+}
