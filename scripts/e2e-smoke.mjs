@@ -324,7 +324,13 @@ async function main() {
       assert.match((await mailServer.nextMail()).text, /## Overview/, 'sent on request, with a plain-text alternative');
     }
     await page.getByRole('link', { name: 'Session notes', exact: true }).click();
-    await page.getByRole('heading', { name: 'vs. Sol Badguy', level: 2 }).waitFor();
+    // On the page for all matchups, each character is a group that starts collapsed.
+    const characterGroup = page.getByRole('heading', { name: 'vs. Sol Badguy', level: 2 }).getByRole('button');
+    assert.equal(await characterGroup.getAttribute('aria-expanded'), 'false');
+    assert.equal(await page.getByRole('link', { name: 'ranked-set', exact: true }).count(), 0, 'sessions are hidden while collapsed');
+    await characterGroup.click();
+    assert.equal(await characterGroup.getAttribute('aria-expanded'), 'true');
+    await screenshot('05b-session-notes-all');
     await page.getByRole('link', { name: 'ranked-set', exact: true }).click();
     await waitForPlayer();
 
