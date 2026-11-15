@@ -121,7 +121,7 @@ function ReviewWorkspace({ video }: { video: Video }) {
               Timestamps
             </TabButton>
             <TabButton id="frames" current={tab} onSelect={selectTab}>
-              Frames
+              Frame data
             </TabButton>
           </div>
 
