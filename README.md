@@ -29,10 +29,12 @@ interface wears the game's colours in light and dark mode.
   timeline - to jump straight back.
 - **Focus points.** Before reviewing, mark where the review should concentrate; the
   review opens on the first one.
-- **Frame data.** A Frames tab beside your notes shows every move of the opponent's
+- **Frame data.** A Frame data tab beside your notes shows every move of the opponent's
   character (or yours, or anyone's): startup, active, recovery, on block, on hit, and
   the rest on demand. Open a move to see its picture and its hitboxes, as on Dustloop.
   Searchable, from Dustloop, saved locally so it works offline.
+- **Resizable side panel.** Drag the border between the video and the notes / frame data
+  panel to give either more room. The width is remembered; double-click to reset.
 - **Collapsible notes.** When a video has timestamps, the notes are grouped under the
   timestamp they follow and each group can be folded away.
 - **AI session summaries.** One click turns a session's notes into coaching advice:
