@@ -1,16 +1,18 @@
 import { z } from 'zod';
 import { MAX_SUMMARY_LENGTH } from '@shared/domain/constants';
+import type { CharacterFrameData } from '@shared/domain/frameData';
 import type { Library } from '@shared/domain/schema';
 import { completeSummary } from '../library/operations';
 import type { LibraryService } from '../library/service';
-import { buildSessionBrief } from './brief';
+import { formatFrameData } from '../framedata/format';
+import { buildSessionBrief, matchupCharacterIds } from './brief';
 import { defineTool, type McpTool } from './mcp';
 import { formatYouTubeResults, type YouTubeSearchPeriod, type YouTubeVideo } from './youtube';
 
 /** Name the MCP server is registered under; the agent sees tools as `<server>-<tool>`. */
 export const AGENT_SERVER_NAME = 'vod-reviewer';
 
-export const AGENT_TOOL_NAMES = ['get_review_session', 'youtube_search', 'save_summary'] as const;
+export const AGENT_TOOL_NAMES = ['get_review_session', 'frame_data', 'youtube_search', 'save_summary'] as const;
 
 /** A run that searches more than this is looping, not researching. */
 const MAX_SEARCHES_PER_RUN = 8;
@@ -18,6 +20,7 @@ const MAX_SEARCHES_PER_RUN = 8;
 export interface AgentToolDependencies {
   library: LibraryService;
   searchYouTube: (query: string, period: YouTubeSearchPeriod) => Promise<YouTubeVideo[]>;
+  getFrameData: (characterId: string) => Promise<CharacterFrameData>;
   /** Called after the agent changed the library, so the UI can be told. */
   onLibraryChanged: (library: Library) => void;
   /** Called once a summary has been saved, for follow-up work such as emailing it. */
@@ -26,7 +29,8 @@ export interface AgentToolDependencies {
 
 /**
  * The tools one agent run may use. They are bound to a single summary: the agent cannot
- * name a session, read anything else in the library, or write anywhere but that summary.
+ * name a session, read anything else in the library, look up characters outside the
+ * matchup, or write anywhere but that summary.
  */
 export function createAgentTools(summaryId: string, deps: AgentToolDependencies): McpTool[] {
   let searches = 0;
@@ -38,6 +42,38 @@ export function createAgentTools(summaryId: string, deps: AgentToolDependencies)
         'Returns the review session to summarize as JSON: the matchup, the video, the notes the player wrote (each with its time in the video) and the moments they flagged. Call this first.',
       input: z.object({}),
       run: () => JSON.stringify(buildSessionBrief(deps.library.library, summaryId), null, 2),
+    }),
+
+    defineTool({
+      name: 'frame_data',
+      description:
+        "Returns frame data from Dustloop for one side of the matchup, one move per line: startup, active, recovery, on block, on hit, guard, invulnerability. For the opponent's moves it also says which of the player's moves punish each one on block.",
+      input: z.object({
+        character: z.enum(['opponent', 'player']).describe("Whose moves: the opponent's character or the player's own."),
+        moves: z
+          .string()
+          .trim()
+          .max(120)
+          .optional()
+          .describe('Comma-separated inputs or move names to look up, e.g. "236K, Bandit Revolver, 6P". Omit to list every move.'),
+      }),
+      run: async ({ character, moves }) => {
+        const characterId = matchupCharacterIds(deps.library.library, summaryId)[character];
+        if (characterId === null) {
+          throw new Error(
+            character === 'player'
+              ? 'The player has not set their character in Settings, so their frame data is not available. Do not guess it.'
+              : 'This video is not filed under a matchup, so there is no opponent character.',
+          );
+        }
+        const data = await deps.getFrameData(characterId);
+        if (character === 'player') return formatFrameData(data, moves);
+
+        // For the opponent's moves, also work out what the player can punish each with.
+        const playerId = matchupCharacterIds(deps.library.library, summaryId).player;
+        const defender = playerId === null ? undefined : await deps.getFrameData(playerId).catch(() => undefined);
+        return formatFrameData(data, moves, defender);
+      },
     }),
 
     defineTool({

@@ -1,0 +1,239 @@
+.panel {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  min-height: 0;
+}
+
+.controls {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.controls select,
+.controls input {
+  width: 100%;
+}
+
+.message {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--color-border);
+  color: var(--color-text-muted);
+  font-size: 14px;
+}
+
+.table {
+  width: 100%;
+  /* Fixed layout keeps long values ("HKD +52 (IAD)") wrapping inside their own column. */
+  table-layout: fixed;
+  border-collapse: collapse;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+
+.table thead th {
+  position: sticky;
+  /* The tab panel that scrolls has this much padding above its content. */
+  top: calc(var(--space-4) * -1);
+  z-index: 1;
+  padding: var(--space-2) var(--space-1);
+  background: var(--color-bg);
+  border-bottom: 2px solid var(--color-text);
+  color: var(--color-text-muted);
+  font-size: 11px;
+  font-weight: 400;
+  letter-spacing: 0.08em;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.table thead th:first-child {
+  text-align: left;
+}
+
+.colNumber {
+  width: 50px;
+}
+
+.colAdvantage {
+  width: 70px;
+}
+
+
+.section th {
+  padding: var(--space-3) var(--space-1) var(--space-1);
+  color: var(--color-accent-text);
+  font-family: var(--font-display);
+  font-size: 14px;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: 0.06em;
+  text-align: left;
+  text-transform: uppercase;
+}
+
+.move th,
+.move td {
+  padding: 5px var(--space-1);
+  border-top: 1px solid var(--color-border);
+  vertical-align: top;
+}
+
+.move th {
+  font-weight: 400;
+  text-align: left;
+}
+
+.move td {
+  font-family: var(--font-mono);
+  text-align: right;
+  /* Break between words ("+7 (IAD)"), and inside one only if it cannot fit at all. */
+  overflow-wrap: break-word;
+}
+
+
+.move:hover,
+.expanded {
+  background: var(--color-surface);
+}
+
+.moveToggle {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-1);
+  width: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-text);
+  text-align: left;
+}
+
+.chevron {
+  flex: none;
+  margin-top: 3px;
+  color: var(--color-text-muted);
+  transition: transform var(--duration-fast) var(--easing);
+}
+
+.chevronCollapsed {
+  transform: rotate(-90deg);
+}
+
+.input {
+  font-family: var(--font-mono);
+  font-weight: 700;
+}
+
+.name {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  color: var(--color-text-muted);
+}
+
+.plus {
+  color: var(--color-plus);
+  font-weight: 700;
+}
+
+.minus {
+  color: var(--color-accent-text);
+}
+
+.details td {
+  padding: 0 var(--space-2) var(--space-3) var(--space-5);
+  background: var(--color-surface);
+}
+
+.details dl {
+  display: grid;
+  gap: var(--space-1);
+  margin: 0;
+  font-size: 12.5px;
+}
+
+.details dl > div {
+  display: grid;
+  grid-template-columns: 96px 1fr;
+  gap: var(--space-2);
+}
+
+.details dt {
+  color: var(--color-text-muted);
+}
+
+.details dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.source {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: 12px;
+  color: var(--color-text-muted);
+}
+
+.source a {
+  color: var(--color-accent-text);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.source strong {
+  color: var(--color-highlight-text);
+}
+
+.pictures {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.pictures img {
+  display: block;
+  width: 100%;
+  max-height: 300px;
+  /* The art is drawn for a dark page, whichever theme the app is in. */
+  background: var(--ink-900);
+  object-fit: contain;
+}
+
+.pictureSwitch {
+  display: flex;
+  align-self: flex-start;
+  border: 1px solid var(--color-border);
+}
+
+.pictureSwitch button {
+  padding: 2px var(--space-3);
+  border: 0;
+  background: none;
+  color: var(--color-text-muted);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.pictureSwitch button:hover {
+  color: var(--color-text);
+}
+
+.pictureSwitch button[aria-pressed='true'] {
+  background: var(--color-accent);
+  color: var(--color-on-accent);
+}
+
+.pictureMissing {
+  font-size: 12px;
+  color: var(--color-text-muted);
+}

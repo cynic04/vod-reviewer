@@ -14,8 +14,9 @@
  * Screenshots of each screen are written to `.e2e/screens/`.
  */
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
-import { mkdir, readdir, readFile, rm, utimes } from 'node:fs/promises';
+import { mkdir, readdir, readFile, rm, utimes, writeFile } from 'node:fs/promises';
 import path from 'node:path';
 import ffmpegPath from 'ffmpeg-static';
 import { simpleParser } from 'mailparser';
@@ -30,6 +31,9 @@ const SCREENS_DIR = path.join(WORK_DIR, 'screens');
 const SAMPLE_NAME = 'ranked-set.mp4';
 const SAMPLE_FPS = 30;
 const SAMPLE_AGE_DAYS = 20;
+const MOVE_IMAGE = 'GGST Sol Badguy 236K.png';
+const HITBOX_IMAGE = 'GGST Sol 236K Hitbox.png';
+const ONE_PIXEL_PNG = 'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
 
 const step = (message) => console.log(`- ${message}`);
 
@@ -45,6 +49,36 @@ async function prepareFixtures() {
       .concat(['-f', 'lavfi', '-i', 'sine=frequency=440:duration=8'])
       .concat(['-pix_fmt', 'yuv420p', '-c:v', 'libx264', '-c:a', 'aac', '-shortest', '-y', samplePath]),
   );
+
+  // Frame data normally comes from Dustloop; a saved copy keeps the test off the network.
+  const move = (fields) => ({
+    ...{ input: '', name: '', type: 'normal', damage: '30', guard: 'All', startup: '', active: '3', recovery: '10' },
+    ...{ onBlock: '', onHit: '', level: '2', counter: 'Mid', invuln: '', notes: '', images: [], hitboxes: [] },
+    ...fields,
+  });
+  await mkdir(path.join(USER_DATA_DIR, 'frame-data'), { recursive: true });
+  await writeFile(
+    path.join(USER_DATA_DIR, 'frame-data', 'sol.json'),
+    JSON.stringify({
+      version: 2,
+      fetchedAt: new Date().toISOString(),
+      moves: [
+        move({ input: '5P', startup: '5', onBlock: '-2', onHit: '+1' }),
+        move({ input: 'c.S', startup: '7', onBlock: '+3', onHit: '+13' }),
+        move({
+          ...{ input: '236K', name: 'Bandit Revolver (1)', type: 'special', startup: '12', onBlock: '-13', invuln: '6-26 Airborne' },
+          ...{ images: [MOVE_IMAGE], hitboxes: [HITBOX_IMAGE] },
+        }),
+      ],
+    }),
+  );
+
+  // Its pictures are kept under a hash of their name; save them so none is downloaded.
+  await mkdir(path.join(USER_DATA_DIR, 'frame-data', 'images'), { recursive: true });
+  for (const name of [MOVE_IMAGE, HITBOX_IMAGE]) {
+    const hash = createHash('sha256').update(name).digest('hex').slice(0, 32);
+    await writeFile(path.join(USER_DATA_DIR, 'frame-data', 'images', `${hash}.png`), Buffer.from(ONE_PIXEL_PNG, 'base64'));
+  }
 
   // Backdate it so the "old video" highlight has something to highlight.
   const recordedAt = new Date(Date.now() - SAMPLE_AGE_DAYS * 24 * 60 * 60 * 1000);
@@ -284,11 +318,15 @@ async function main() {
     await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
     assert.deepEqual(
       (await rpc('tools/list')).tools.map((tool) => tool.name),
-      ['get_review_session', 'youtube_search', 'save_summary'],
+      ['get_review_session', 'frame_data', 'youtube_search', 'save_summary'],
     );
     const brief = JSON.parse(await callTool('get_review_session'));
     assert.equal(brief.matchup.opponent, 'Sol Badguy');
     assert.equal(brief.notes[0].text, 'Dropped the combo after 6P - practise the route');
+    assert.match(
+      await callTool('frame_data', { character: 'opponent', moves: 'Bandit Revolver' }),
+      /236K \(Bandit Revolver \(1\)\): startup 12, active 3, recovery 10, on block -13/,
+    );
     await callTool('save_summary', {
       markdown: '## Overview\n\nYou drop the 6P route under pressure.\n\n## Study material\n\n- [Combo guide](https://www.youtube.com/watch?v=e2eVideo001) - the route.\n\n<script>window.pwned = true</script>',
     });
@@ -356,6 +394,27 @@ async function main() {
     assert.equal(await noteGroup.getAttribute('aria-expanded'), 'false');
     await page.getByRole('button', { name: 'Expand all' }).click();
     await groupedNote.waitFor();
+
+    step('   frame data: the opponent\'s moves, searchable, with details on demand');
+    await page.keyboard.press('f');
+    const frames = page.getByRole('tabpanel', { name: 'Frames' });
+    assert.equal(await frames.getByLabel('Character').inputValue(), 'sol', 'opens on the opponent');
+    // Active and recovery are columns only when the sidebar is wide enough.
+    await frames.getByRole('row', { name: /c\.S 7 (3 10 )?\+3 \+13/ }).waitFor();
+    assert.equal(await frames.getByRole('button', { expanded: false }).count(), 3);
+    await frames.getByRole('searchbox').fill('bandit');
+    assert.equal(await frames.getByRole('button', { expanded: false }).count(), 1, 'search narrows the list');
+    await frames.getByRole('button', { name: /236K/ }).click();
+    await frames.getByText('6-26 Airborne').waitFor();
+    const picture = frames.getByRole('img', { name: '236K Bandit Revolver (1)', exact: true });
+    await picture.waitFor();
+    assert.ok(await picture.evaluate((image) => image.complete && image.naturalWidth > 0), 'the move picture loads');
+    await frames.getByRole('button', { name: 'Hitbox' }).click();
+    const hitbox = frames.getByRole('img', { name: 'Hitboxes of 236K Bandit Revolver (1)' });
+    await hitbox.waitFor();
+    await page.waitForFunction((image) => image.complete && image.naturalWidth > 0, await hitbox.elementHandle());
+    await screenshot('05c-frame-data');
+    await page.getByRole('tab', { name: /Notes/ }).click();
 
     step('   the scrubber seeks and the picture toggles playback');
     const stage = page.getByRole('region', { name: 'Video player' });

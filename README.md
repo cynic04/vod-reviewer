@@ -29,11 +29,16 @@ interface wears the game's colours in light and dark mode.
   timeline - to jump straight back.
 - **Focus points.** Before reviewing, mark where the review should concentrate; the
   review opens on the first one.
+- **Frame data.** A Frames tab beside your notes shows every move of the opponent's
+  character (or yours, or anyone's): startup, active, recovery, on block, on hit, and
+  the rest on demand. Open a move to see its picture and its hitboxes, as on Dustloop.
+  Searchable, from Dustloop, saved locally so it works offline.
 - **Collapsible notes.** When a video has timestamps, the notes are grouped under the
   timestamp they follow and each group can be folded away.
 - **AI session summaries.** One click turns a session's notes into coaching advice:
-  recurring patterns, what went well, an action plan, and links to recent high-level
-  footage of the matchup and to guides for the skills that need work. Written by GitHub
+  recurring patterns, what went well, an action plan backed by real frame data (which
+  of your moves punish what), and links to recent high-level footage of the matchup and
+  to guides for the skills that need work. Written by GitHub
   Copilot on a small model, in a terminal window you can watch.
 - **Session notes.** Every review session and its summary in one place, grouped by
   character, from the top bar or from any matchup. Characters and the sessions under
@@ -57,14 +62,16 @@ Steps 3 and 4 can be reopened for any video from its folder.
 
 In the notes panel, press **Summarize** once you have written some notes. A terminal
 window opens and GitHub Copilot runs the `/summarize` skill: it reads the notes from that
-session, looks for patterns, searches YouTube for recent high-level play of the matchup
+session, looks for patterns, looks up frame data for the moves you mention and works
+out what punishes them, searches YouTube for recent high-level play of the matchup
 and for guides on the fundamentals you struggled with, and reads the opponent's
 counterstrategy page on Dustloop. About half a minute later the summary appears under
 **Session notes**.
 
 - Requires the [GitHub Copilot CLI](https://docs.github.com/copilot/how-tos/copilot-cli),
   installed and signed in (`copilot` must work in a terminal). Windows only for now.
-- Set **Your character** in Settings so the search is for your side of the matchup.
+- Set **Your character** in Settings so the search is for your side of the matchup and
+  the summary can name the buttons that punish each move.
 - The default model is `claude-haiku-4.5`, chosen to keep the cost low (about 4-5 AI
   credits per summary). Change it under **Summary model** in Settings.
 - The agent can only read that one session and save that one summary; it has no access to
@@ -152,6 +159,7 @@ connection. **Remove account** in the same dialog deletes it.
 | Mouse wheel | Zoom towards the cursor |
 | `M` | Add a timestamp (or focus point) at the current moment |
 | `N` | Write a note at the current moment |
+| `F` | Open the frame data |
 | `Ctrl` + `Enter` | Save the note being written |
 
 The same list is available in the app under *Shortcuts*.
@@ -165,7 +173,8 @@ Everything the app knows is in one human-readable file:
 ```
 
 It holds your folders, the videos you added (by path), timestamps, notes, review sessions,
-session summaries and settings. The email password is not in it. The installed app and a development run share this one file. Back it up or
+session summaries and settings. The email password is not in it. Frame data downloaded
+from Dustloop is kept beside it in `frame-data\` and can be deleted at any time. The installed app and a development run share this one file. Back it up or
 sync it like any other file. Its structure, and how it maps
 onto database tables, is documented in [docs/data-model.md](docs/data-model.md).
 
@@ -183,8 +192,9 @@ src/
   preload/      the bridge between the two
   main/agent/   the summarize agent harness (MCP endpoint, tools, launcher)
   main/email/   summary emails (HTML content, SMTP sender, encrypted password store)
+  main/framedata/ frame data from Dustloop (API client, cache, punish calculation)
   renderer/     the React app (features: library, import, focus, review, player,
-                annotations, session-notes, email)
+                annotations, session-notes, email, frame-data)
 docs/           architecture, data model + ERD, design system, decision records
 scripts/        character art fetcher, icon generator, end-to-end smoke test
 build/          installer resources (the app icon)
@@ -206,11 +216,17 @@ resources/      files bundled into the main process (the window icon, the agent'
 - Frame stepping assumes a constant frame rate, which is what OBS and ShadowPlay record.
   Until a new video has played for a second or two, 60 fps is assumed.
 - The installer is Windows-only, unsigned, and has no auto-update.
+- Frame data needs the network the first time each character is opened, and a move's
+  picture the first time that move is opened. Punish advice is
+  by frames only: range and pushback are not modelled.
 - Emailing needs a one-time account setup, and for Gmail an app password.
 - Session summaries need the GitHub Copilot CLI and spend AI credits. They are written by
   a small model: treat specific claims about moves and frame data as leads to verify.
 
 ## Credits
+
+Frame data comes from the [Dustloop wiki](https://www.dustloop.com/w/GGST) and its
+contributors (CC BY-NC-SA).
 
 Guilty Gear -Strive- and its character artwork are (c) ARC SYSTEM WORKS. The portraits in
 `src/renderer/src/assets/characters` come from the official site and are included because

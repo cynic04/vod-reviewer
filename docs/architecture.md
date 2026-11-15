@@ -48,6 +48,7 @@ src/
     media/           the streaming protocol
     agent/           the summarize agent harness: MCP endpoint, tools, launcher, YouTube search
     email/           summary emails: HTML content, SMTP sender, encrypted credential store
+    framedata/       frame data: Dustloop API client, on-disk cache, punish calculation
     videos/          directory browser, path safety
   preload/           The one bridge function exposed to the renderer
   renderer/src/      The React app
@@ -62,6 +63,7 @@ src/
       annotations/   notes and timestamps
       session-notes/ AI summaries of review sessions, grouped by character
       email/         email setup dialog and the "Email" button
+      frame-data/    the Frames tab of the review screen
       characters/    portraits and folder labels
     store/           library store, selectors, toasts
     lib/             small utilities
@@ -134,7 +136,9 @@ The renderer is treated as untrusted, the way a web page would be:
 - `contextIsolation: true`, `sandbox: true`, `nodeIntegration: false`.
 - The preload script exposes a single function and forwards to a single IPC channel.
 - Every request is checked for its sender and validated before it reaches a handler.
-- A strict Content-Security-Policy; no remote content is loaded at all.
+- A strict Content-Security-Policy; the renderer loads no remote content at all. The
+  main process makes the app's only outgoing requests: YouTube search and Dustloop frame
+  data (both read-only, no account), and SMTP when a summary is emailed.
 - Navigation away from the app and new windows are blocked.
 - The agent endpoint listens on loopback only, serves each run at an unguessable URL,
   refuses browser-originated requests, and exposes nothing but that run's three tools.
@@ -146,6 +150,23 @@ The renderer is treated as untrusted, the way a web page would be:
 - The renderer never receives `file://` access. Videos are served by the `vod-media://`
   protocol, which only resolves (a) videos that are in the library and (b) supported video
   files inside the configured videos folder. See [ADR 0003](decisions/0003-custom-media-protocol.md).
+
+## Frame data
+
+`src/main/framedata` downloads move data from the Dustloop wiki's Cargo API, keeps one
+JSON file per character in the user-data folder, and serves it to two consumers through
+the same service: the **Frames** tab of the review screen (over IPC, `frameData:get`) and
+the summarize agent (the `frame_data` MCP tool). A copy is reused for a week and an old
+one is served if a refresh fails. The renderer never talks to the network itself.
+
+Move and hitbox pictures follow the same rule. The Frames tab asks for
+`vod-media://move-image/?file=<name>`; the protocol handler hands the name to the frame
+data service, which looks the picture up through the wiki's `imageinfo` API the first
+time, saves it under a hash of its name in `frame-data\images\`, and serves the saved
+copy from then on. Names that do not look like image files are refused, and downloads
+are only accepted from Dustloop's hosts. The page's CSP allows images from `'self'`,
+`data:` and `vod-media:` only.
+See [ADR 0012](decisions/0012-frame-data.md).
 
 ## Emailing summaries
 

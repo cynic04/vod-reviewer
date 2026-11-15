@@ -48,4 +48,5 @@ Alternatives considered:
 - The library schema moved to version 2 (summaries, plus the player-character and
   summary-model settings) with an automatic migration from version 1.
 
-See [agent-harness.md](../agent-harness.md) for how it works.
+See [agent-harness.md](../agent-harness.md) for how it works. A fourth tool, rame_data,
+was added later: [ADR 0012](0012-frame-data.md).

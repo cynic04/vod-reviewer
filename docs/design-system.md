@@ -85,6 +85,13 @@ No fonts are bundled or downloaded; the app uses what Windows ships.
   header with the red rule and the opponent's portrait, a bone-white body, ink video cards
   with yellow calls to action. Fonts fall back to what phones have (Arial Black for
   display, the system sans for text), and the layout is a single fluid column up to 640px.
+- **Frame advantage.** In the frame data table, plus frames are green (`--color-plus`,
+  the one colour outside the game's palette, used only here) and minus frames red. The
+  sign is always in the text, so the colour is an aid and not the message. Numbers are
+  monospaced so columns line up.
+- **Move pictures.** Shown inside the opened row at the panel's width, at most 300px
+  tall, on the darkest ink in both themes: the art and the hitbox overlays are drawn for
+  a dark page. The Move / Hitbox switch is a small two-part toggle in the accent red.
 - **Time is always clickable.** Anywhere a timecode appears as a chip, clicking it seeks
   the video there.
 

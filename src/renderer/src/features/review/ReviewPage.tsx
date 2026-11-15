@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Navigate, useParams } from 'react-router-dom';
 import type { Video } from '@shared/domain/schema';
 import { routes } from '@renderer/app/routes';
@@ -7,6 +7,7 @@ import { cx } from '@renderer/lib/cx';
 import { NotesPanel } from '@renderer/features/annotations/NotesPanel';
 import { TimestampComposer } from '@renderer/features/annotations/TimestampComposer';
 import { TimestampList } from '@renderer/features/annotations/TimestampList';
+import { FrameDataPanel } from '@renderer/features/frame-data/FrameDataPanel';
 import { toTimelineMarkers } from '@renderer/features/player/markers';
 import { PlayerSurface } from '@renderer/features/player/PlayerSurface';
 import { usePlayerShortcuts, type ShortcutMap } from '@renderer/features/player/usePlayerShortcuts';
@@ -29,9 +30,10 @@ import styles from './ReviewPage.module.css';
 const REVIEW_SHORTCUTS = [
   { keys: 'M', action: 'Add a timestamp here' },
   { keys: 'N', action: 'Write a note here' },
+  { keys: 'F', action: 'Open the frame data' },
 ];
 
-type SidebarTab = 'notes' | 'timestamps';
+type SidebarTab = 'notes' | 'timestamps' | 'frames';
 
 export function ReviewPage() {
   const { videoId } = useParams();
@@ -54,6 +56,13 @@ function ReviewWorkspace({ video }: { video: Video }) {
   const markers = useMemo(() => toTimelineMarkers(timestamps, notes), [timestamps, notes]);
 
   const [tab, setTab] = useState<SidebarTab>('notes');
+  // Frame data is only requested once its tab has been opened, then stays mounted so the
+  // chosen character and the search survive switching tabs.
+  const [hasOpenedFrames, setHasOpenedFrames] = useState(false);
+  const selectTab = useCallback((next: SidebarTab) => {
+    setTab(next);
+    if (next === 'frames') setHasOpenedFrames(true);
+  }, []);
   const [noteFocusRequest, setNoteFocusRequest] = useState(0);
   const [startedSessionId, setStartedSessionId] = useState<string | null>(null);
   // A session disappears when its last note is deleted; the next note then opens a new one.
@@ -84,8 +93,9 @@ function ReviewWorkspace({ video }: { video: Video }) {
         setTab('notes');
         setNoteFocusRequest((count) => count + 1);
       },
+      f: () => selectTab('frames'),
     }),
-    [createTimestamp, getCurrentTime, video.id],
+    [createTimestamp, getCurrentTime, selectTab, video.id],
   );
   usePlayerShortcuts(player, zoom, shortcuts);
 
@@ -104,11 +114,14 @@ function ReviewWorkspace({ video }: { video: Video }) {
       sidebar={
         <>
           <div className={styles.tabs} role="tablist" aria-label="Review tools">
-            <TabButton id="notes" current={tab} count={notes.length} onSelect={setTab}>
+            <TabButton id="notes" current={tab} count={notes.length} onSelect={selectTab}>
               Notes
             </TabButton>
-            <TabButton id="timestamps" current={tab} count={timestamps.length} onSelect={setTab}>
+            <TabButton id="timestamps" current={tab} count={timestamps.length} onSelect={selectTab}>
               Timestamps
+            </TabButton>
+            <TabButton id="frames" current={tab} onSelect={selectTab}>
+              Frames
             </TabButton>
           </div>
 
@@ -147,6 +160,16 @@ function ReviewWorkspace({ video }: { video: Video }) {
               emptyMessage="No timestamps yet. Press M at any moment to mark it, then click it here to jump back."
             />
           </div>
+
+          <div
+            className={styles.tabPanel}
+            role="tabpanel"
+            id="panel-frames"
+            aria-labelledby="tab-frames"
+            hidden={tab !== 'frames'}
+          >
+            {hasOpenedFrames && <FrameDataPanel opponentCharacterId={folder?.characterId ?? null} />}
+          </div>
         </>
       }
     >
@@ -158,7 +181,8 @@ function ReviewWorkspace({ video }: { video: Video }) {
 interface TabButtonProps {
   id: SidebarTab;
   current: SidebarTab;
-  count: number;
+  /** Number shown beside the label, where the tab has something to count. */
+  count?: number;
   onSelect: (tab: SidebarTab) => void;
   children: string;
 }
@@ -175,7 +199,8 @@ function TabButton({ id, current, count, onSelect, children }: TabButtonProps) {
       className={cx(styles.tab, selected && styles.selected)}
       onClick={() => onSelect(id)}
     >
-      {children} <span className={styles.count}>{count}</span>
+      {children}
+      {count !== undefined && <span className={styles.count}>{count}</span>}
     </button>
   );
 }

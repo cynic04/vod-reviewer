@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import type { CharacterFrameData } from '../domain/frameData';
 import {
   emailSettingsSchema,
   folderSchema,
@@ -78,6 +79,9 @@ export const ipcRequestSchemas = {
   'email:remove': z.undefined(),
   'email:sendTest': z.undefined(),
   'email:sendSummary': z.object({ summaryId: id }),
+
+  /** A character's frame data. `refresh` downloads a new copy instead of using the saved one. */
+  'frameData:get': z.object({ characterId: id, refresh: z.boolean() }),
 } as const;
 
 export type IpcChannel = keyof typeof ipcRequestSchemas;
@@ -132,6 +136,7 @@ interface IpcResponses {
   'email:remove': Library;
   'email:sendTest': { sentTo: string };
   'email:sendSummary': { sentTo: string };
+  'frameData:get': CharacterFrameData;
 }
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof ipcRequestSchemas)[C]>;

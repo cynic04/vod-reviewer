@@ -1,15 +1,29 @@
 import { createReadStream } from 'node:fs';
-import { stat } from 'node:fs/promises';
+import { readFile, stat } from 'node:fs/promises';
 import { Readable } from 'node:stream';
 import { protocol } from 'electron';
 import type { Library } from '@shared/domain/schema';
-import { MEDIA_HOST_PREVIEW, MEDIA_HOST_VIDEO, MEDIA_SCHEME } from '@shared/media';
+import { MEDIA_HOST_MOVE_IMAGE, MEDIA_HOST_PREVIEW, MEDIA_HOST_VIDEO, MEDIA_SCHEME } from '@shared/media';
 import { isInside, isSupportedVideoFile, videoMimeType } from '../videos/paths';
 import { parseRangeHeader } from './range';
 
 export interface MediaProtocolDependencies {
   getLibrary: () => Library;
   getVideosRoot: () => string;
+  /** Resolves a move picture to a local file, downloading it first if needed. */
+  getMoveImage: (fileName: string) => Promise<{ filePath: string; mimeType: string }>;
+}
+
+/** Move pictures are small and never change under a given name, so they are sent whole and cached. */
+async function serveMoveImage(url: URL, deps: MediaProtocolDependencies): Promise<Response> {
+  try {
+    const { filePath, mimeType } = await deps.getMoveImage(url.searchParams.get('file') ?? '');
+    return new Response(await readFile(filePath), {
+      headers: { 'Content-Type': mimeType, 'Cache-Control': 'max-age=604800, immutable' },
+    });
+  } catch {
+    return new Response('Not found', { status: 404 });
+  }
 }
 
 /** Must run before the app is ready. */
@@ -47,7 +61,10 @@ function resolveFilePath(url: URL, deps: MediaProtocolDependencies): string | nu
  */
 export function handleMediaRequests(deps: MediaProtocolDependencies): void {
   protocol.handle(MEDIA_SCHEME, async (request) => {
-    const filePath = resolveFilePath(new URL(request.url), deps);
+    const url = new URL(request.url);
+    if (url.hostname === MEDIA_HOST_MOVE_IMAGE) return serveMoveImage(url, deps);
+
+    const filePath = resolveFilePath(url, deps);
     if (filePath === null) return new Response('Not found', { status: 404 });
 
     let size: number;
