@@ -1,4 +1,6 @@
 .panel {
+  /* Lets the table choose its layout from the width of the panel it is in. */
+  container-type: inline-size;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -151,6 +153,13 @@
   background: var(--color-surface);
 }
 
+/* Takes the width the columns give it without asking for any: a long note must not
+   change the column widths when a row is opened. */
+.detailsBody {
+  width: 0;
+  min-width: 100%;
+}
+
 .details dl {
   display: grid;
   gap: var(--space-1);
@@ -234,4 +243,27 @@
 .pictureMissing {
   font-size: 12px;
   color: var(--color-text-muted);
+}
+
+/* With room to spare, columns are as wide as their content, so values such as
+   "Until Landing+10" and "KD +31 (IAS)" stay on one line. */
+@container (min-width: 480px) {
+  .table {
+    table-layout: auto;
+  }
+
+  .colNumber,
+  .colAdvantage {
+    width: auto;
+  }
+
+  .move td,
+  .table thead th {
+    padding-left: var(--space-3);
+  }
+
+  .move td {
+    /* If the values still cannot fit, break anywhere before overflowing the panel. */
+    overflow-wrap: anywhere;
+  }
 }
