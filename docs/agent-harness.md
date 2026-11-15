@@ -24,6 +24,9 @@ sequenceDiagram
     Main-->>UI: library (summary pending)
     CLI->>Main: MCP get_review_session
     Main-->>CLI: matchup, video, notes, markers
+    CLI->>Main: MCP frame_data (moves named in the notes)
+    Main->>Web: Dustloop API (unless cached)
+    Main-->>CLI: frame data + which moves punish
     CLI->>Main: MCP youtube_search (matchup footage, guides)
     Main->>Web: search
     Main-->>CLI: titles, channels, ages, URLs
@@ -40,7 +43,8 @@ sequenceDiagram
 | --- | --- | --- |
 | The skill | [`resources/agent/skills/summarize/SKILL.md`](../resources/agent/skills/summarize/SKILL.md) | The agent's instructions: how to read the notes, what to research, the exact shape of the summary. This is the file to edit to change what summaries say. |
 | The harness | [`src/main/agent/harness.ts`](../src/main/agent/harness.ts) | Starts runs and hosts the endpoint the agent talks to. |
-| The tools | [`src/main/agent/tools.ts`](../src/main/agent/tools.ts) | `get_review_session`, `youtube_search`, `save_summary`. |
+| The tools | [`src/main/agent/tools.ts`](../src/main/agent/tools.ts) | `get_review_session`, `frame_data`, `youtube_search`, `save_summary`. |
+| Frame data | [`src/main/framedata`](../src/main/framedata) | Dustloop lookup, local cache, and the punish calculation the tool prints. |
 | The protocol | [`src/main/agent/mcp.ts`](../src/main/agent/mcp.ts) | A minimal Model Context Protocol server over loopback HTTP. |
 | The launcher | [`src/main/agent/launcher.ts`](../src/main/agent/launcher.ts) | Builds the `copilot` command line and the batch file that runs it. |
 | YouTube search | [`src/main/agent/youtube.ts`](../src/main/agent/youtube.ts) | Search without an API key, reduced to a few lines per query. |
@@ -65,11 +69,13 @@ sequenceDiagram
            --allow-tool vod-reviewer --allow-all-urls
            --available-tools skill web_fetch
                              vod-reviewer-get_review_session
+                             vod-reviewer-frame_data
                              vod-reviewer-youtube_search
                              vod-reviewer-save_summary
    ```
 
-5. The agent follows the skill: reads the session, researches, and calls `save_summary`.
+5. The agent follows the skill: reads the session, looks up frame data for the moves in
+   the notes, researches, and calls `save_summary`.
 6. The app stores the markdown, marks the summary ready and pushes the new library to the
    window, where it appears under **Session notes** without a refresh.
 
@@ -83,6 +89,7 @@ The terminal stays open afterwards so the run can be read; closing it is safe at
 | Tool | Arguments | Returns |
 | --- | --- | --- |
 | `get_review_session` | none | JSON: the matchup (your character and the opponent's), the video, the session's notes with their times, and the moments you flagged. |
+| `frame_data` | `character` (`opponent` or `player`), optional `moves` | Frame data from Dustloop for that side of the matchup, one move per line. For the opponent's moves, each line is followed by which of the player's moves punish it on block. |
 | `youtube_search` | `query`, `period` (`month`, `year` or `any`) | Up to six videos, one per line: title, channel, age, length, views, URL. At most eight searches per run. |
 | `save_summary` | `markdown` | Stores the summary. Works once per run. |
 
@@ -91,8 +98,8 @@ whose address it knows - in practice the Dustloop wiki).
 
 ## Why it is built this way
 
-**The agent never touches the library file.** It reaches the app through three narrow
-tools bound to *one* summary. It cannot name another session, read other notes, or write
+**The agent never touches the library file.** It reaches the app through four narrow
+tools bound to *one* summary and its matchup. It cannot name another session, read other notes, or write
 anything except that summary's text. Each run has its own endpoint URL containing a
 random id; the server listens on `127.0.0.1` only and refuses requests that carry a
 browser `Origin`.
@@ -112,6 +119,12 @@ search tool, YouTube's result page is a megabyte of script, and its fetch tool r
 loopback addresses - so the search runs in the main process and is offered as an MCP tool,
 which *is* allowed on loopback. The agent chooses the queries; the app returns six short
 lines per query.
+
+**Frame numbers come from a tool, and so does the comparison.** The skill forbids frame
+data from memory. `frame_data` returns the numbers from Dustloop and also works out, in
+code, which of the player's moves are fast enough to punish each opponent move - because
+in testing the small model had the right numbers and still compared them wrongly. See
+[ADR 0012](decisions/0012-frame-data.md).
 
 **Links must come from tool results.** The skill forbids URLs from memory and ends with a
 checklist. Small models are prone to inventing plausible links; requiring every URL to
@@ -153,8 +166,9 @@ cd $env:APPDATA\vod-reviewer\agent
 ## Testing
 
 - `src/main/agent/agent.test.ts` covers the protocol, each tool, the endpoint's access
-  rules, the launcher's quoting, and the YouTube parser.
+  rules, the launcher's quoting, and the YouTube parser; `src/main/framedata/framedata.test.ts`
+  covers the Dustloop parser, the cache and the punish calculation.
 - The end-to-end test starts the app with `VOD_REVIEWER_AGENT_DRY_RUN=1`, which prepares a
   run but opens no terminal. The test then plays the agent itself: it reads the run's
-  MCP config, calls the three tools over HTTP, and checks that the summary appears in the
+  MCP config, calls the tools over HTTP, and checks that the summary appears in the
   window. No AI credits are spent by the test suite.

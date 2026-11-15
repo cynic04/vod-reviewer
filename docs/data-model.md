@@ -114,6 +114,12 @@ stored in `library.json`, but it would be a seeded lookup table in a database.
 | Session summary | `summaries` | The AI-written coaching summary of one session, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
 | Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, the model that writes summaries, and the email account summaries are sent with (`email`, `null` until set up). |
 
+**Also not in this file:** frame data. It is reference data downloaded from Dustloop and
+kept as one file per character in `frame-data\` beside the library, where it can be
+deleted and re-downloaded at any time. Move pictures are kept in `frame-data\images\`,
+each named by a hash of its wiki file name. In a database it would be a `move` table keyed by
+character and input, refreshed by a job. See [ADR 0012](decisions/0012-frame-data.md).
+
 **What is deliberately not in this file:** the email account's password. It is stored
 encrypted by the operating system in `email-credentials.bin`, next to `library.json`, and
 would map to a secrets manager rather than a table. See
