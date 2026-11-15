@@ -107,6 +107,13 @@ const summaryRenderer = new Marked({
     blockquote({ tokens }: Tokens.Blockquote): string {
       return `<blockquote style="margin:0 0 14px;padding:2px 0 2px 14px;border-left:3px solid ${COLOR.rule};color:${COLOR.muted};">${this.parser.parse(tokens)}</blockquote>`;
     },
+    table({ header, rows }: Tokens.Table): string {
+      const cell = (content: Tokens.TableCell, tag: 'th' | 'td'): string =>
+        `<${tag} align="left" valign="top" style="padding:6px 8px;border:1px solid ${COLOR.rule};font-size:13px;line-height:1.4;${tag === 'th' ? `background:${COLOR.bone};font-weight:700;` : ''}">${this.parser.parseInline(content.tokens)}</${tag}>`;
+      const head = `<tr>${header.map((content) => cell(content, 'th')).join('')}</tr>`;
+      const body = rows.map((row) => `<tr>${row.map((content) => cell(content, 'td')).join('')}</tr>`).join('');
+      return `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 14px;border-collapse:collapse;">${head}${body}</table>`;
+    },
     hr(): string {
       return `<hr style="margin:20px 0;border:0;border-top:1px solid ${COLOR.rule};">`;
     },

@@ -70,3 +70,19 @@ export function buildSessionBrief(library: Library, summaryId: string): SessionB
       })),
   };
 }
+
+/** Ids of the two characters of a summary's matchup; `null` where one is not known. */
+export function matchupCharacterIds(
+  library: Library,
+  summaryId: string,
+): { player: string | null; opponent: string | null } {
+  const summary = library.summaries.find((candidate) => candidate.id === summaryId);
+  if (!summary) throw notFound('Summary', summaryId);
+
+  const video = library.videos.find((candidate) => candidate.id === summary.videoId);
+  const folder = library.folders.find((candidate) => candidate.id === video?.folderId);
+  return {
+    player: getCharacter(library.settings.playerCharacterId)?.id ?? null,
+    opponent: getCharacter(folder?.characterId ?? null)?.id ?? null,
+  };
+}

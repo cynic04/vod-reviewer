@@ -2,6 +2,7 @@ import { mkdir, readdir, rm, writeFile } from 'node:fs/promises';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
+import type { CharacterFrameData } from '@shared/domain/frameData';
 import type { Library, SessionSummary } from '@shared/domain/schema';
 import summarizeSkill from '../../../resources/agent/skills/summarize/SKILL.md?raw';
 import { removeSummary, requestSummary } from '../library/operations';
@@ -21,6 +22,7 @@ export interface AgentHarnessDependencies {
   /** Opens a new terminal window running the given script. */
   openTerminal: (scriptPath: string) => Promise<void>;
   searchYouTube: (query: string, period: YouTubeSearchPeriod) => Promise<YouTubeVideo[]>;
+  getFrameData: (characterId: string) => Promise<CharacterFrameData>;
   /** Tells the UI about a change the agent made. */
   onLibraryChanged: (library: Library) => void;
   /** Called once the agent has saved a summary. */
@@ -31,9 +33,9 @@ export interface AgentHarnessDependencies {
  * Runs the summarize agent and is the only thing it can talk to.
  *
  * The agent is the GitHub Copilot CLI in a terminal window, started with the `/summarize`
- * skill. It gets no access to the library file: instead the app serves three tools to it
- * over a loopback MCP endpoint that exists only for that run - read the session, search
- * YouTube, hand in the summary. See docs/agent-harness.md.
+ * skill. It gets no access to the library file: instead the app serves four tools to it
+ * over a loopback MCP endpoint that exists only for that run - read the session, look up
+ * frame data, search YouTube, hand in the summary. See docs/agent-harness.md.
  */
 export class AgentHarness {
   readonly #deps: AgentHarnessDependencies;

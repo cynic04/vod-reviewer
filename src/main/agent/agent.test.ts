@@ -2,6 +2,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
 import { matchupFolderId } from '@shared/domain/characters';
+import type { FrameDataMove } from '@shared/domain/frameData';
 import type { Library } from '@shared/domain/schema';
 import {
   createEmptyLibrary,
@@ -85,9 +86,42 @@ async function agentFixture(): Promise<{
       searches.push(`${period}:${query}`);
       return Promise.resolve([video]);
     },
+    getFrameData: (characterId) =>
+      Promise.resolve({
+        characterId,
+        fetchedAt: '2026-11-14T00:00:00.000Z',
+        isStale: false,
+        sourceUrl: 'https://www.dustloop.com/w/GGST/Sol_Badguy/Frame_Data',
+        moves: [
+          move({ input: '6P', startup: '9', onBlock: '-13', invuln: '1-3 Below Crouch' }),
+          move({ input: '236K', name: 'Bandit Revolver (1)', type: 'special', startup: '12', onBlock: '-13' }),
+        ],
+      }),
     onLibraryChanged: (snapshot) => pushed.push(snapshot),
   });
   return { service, summaryId: summary.id, tools, pushed, searches };
+}
+
+function move(fields: Partial<FrameDataMove>): FrameDataMove {
+  return {
+    input: '',
+    name: '',
+    type: 'normal',
+    damage: '30',
+    guard: 'All',
+    startup: '',
+    active: '3',
+    recovery: '10',
+    onBlock: '',
+    onHit: '',
+    level: '2',
+    counter: 'Mid',
+    invuln: '',
+    notes: '',
+    images: [],
+    hitboxes: [],
+    ...fields,
+  };
 }
 
 const call = async (tools: readonly McpTool[], name: string, args: unknown = {}): Promise<JsonRpcResponse | null> =>
@@ -111,7 +145,12 @@ describe('MCP protocol', () => {
 
     const listed = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, tools, SERVER_INFO);
     const advertised = (listed?.result as { tools: { name: string; inputSchema: { type: string } }[] }).tools;
-    expect(advertised.map((tool) => tool.name)).toEqual(['get_review_session', 'youtube_search', 'save_summary']);
+    expect(advertised.map((tool) => tool.name)).toEqual([
+      'get_review_session',
+      'frame_data',
+      'youtube_search',
+      'save_summary',
+    ]);
     expect(advertised.every((tool) => tool.inputSchema.type === 'object')).toBe(true);
 
     expect(await handleMcpMessage({ jsonrpc: '2.0', method: 'notifications/initialized' }, tools, SERVER_INFO)).toBeNull();
@@ -131,6 +170,30 @@ describe('agent tools', () => {
       { time: '2:05', text: 'Never anti-aired' },
     ]);
     expect(brief.markers).toEqual([{ time: '2:05', kind: 'focus', label: 'Round 2' }]);
+  });
+
+  it('looks up frame data for either side of the matchup, and only for that matchup', async () => {
+    const { tools, service } = await agentFixture();
+
+    const all = textOf(await call(tools, 'frame_data', { character: 'opponent' })).text;
+    expect(all).toContain('Sol Badguy frame data from Dustloop (2026-11-14), 2 of 2 moves.');
+    expect(all).toContain('6P: startup 9, active 3, recovery 10, on block -13, on hit -, guard All, invuln 1-3 Below Crouch');
+
+    const one = textOf(await call(tools, 'frame_data', { character: 'opponent', moves: 'bandit revolver' })).text;
+    expect(one).toContain('236K (Bandit Revolver (1)): startup 12');
+    expect(one).not.toContain('6P:');
+
+    // The fixture's lookup echoes whichever id it is asked for: the player is Millia.
+    expect(textOf(await call(tools, 'frame_data', { character: 'player', moves: '6P' })).text).toContain('Millia Rage');
+    const unknown = textOf(await call(tools, 'frame_data', { character: 'opponent', moves: 'Kamehameha' }));
+    expect(unknown.text).toMatch(/No move of Sol Badguy matches "Kamehameha"\. Their moves are: 6P, 236K Bandit Revolver \(1\)/);
+    expect(textOf(await call(tools, 'frame_data', { character: 'ryu' })).isError).toBe(true);
+
+    await service.update((library) => updateSettings(library, { playerCharacterId: null }));
+    expect(textOf(await call(tools, 'frame_data', { character: 'player' }))).toMatchObject({
+      isError: true,
+      text: expect.stringContaining('has not set their character') as string,
+    });
   });
 
   it('searches with the requested period, defaults to the last year, and caps the number of searches', async () => {
@@ -226,6 +289,7 @@ describe('launcher', () => {
       'skill',
       'web_fetch',
       'vod-reviewer-get_review_session',
+      'vod-reviewer-frame_data',
       'vod-reviewer-youtube_search',
       'vod-reviewer-save_summary',
     ]);
