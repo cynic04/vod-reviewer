@@ -63,7 +63,7 @@ src/
       annotations/   notes and timestamps
       session-notes/ AI summaries of review sessions, grouped by character
       email/         email setup dialog and the "Email" button
-      frame-data/    the Frames tab of the review screen
+      frame-data/    the Frame data tab of the review screen
       characters/    portraits and folder labels
     store/           library store, selectors, toasts
     lib/             small utilities
@@ -155,11 +155,11 @@ The renderer is treated as untrusted, the way a web page would be:
 
 `src/main/framedata` downloads move data from the Dustloop wiki's Cargo API, keeps one
 JSON file per character in the user-data folder, and serves it to two consumers through
-the same service: the **Frames** tab of the review screen (over IPC, `frameData:get`) and
+the same service: the **Frame data** tab of the review screen (over IPC, `frameData:get`) and
 the summarize agent (the `frame_data` MCP tool). A copy is reused for a week and an old
 one is served if a refresh fails. The renderer never talks to the network itself.
 
-Move and hitbox pictures follow the same rule. The Frames tab asks for
+Move and hitbox pictures follow the same rule. The Frame data tab asks for
 `vod-media://move-image/?file=<name>`; the protocol handler hands the name to the frame
 data service, which looks the picture up through the wiki's `imageinfo` API the first
 time, saves it under a hash of its name in `frame-data\images\`, and serves the saved

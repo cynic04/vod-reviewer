@@ -114,6 +114,10 @@ stored in `library.json`, but it would be a seeded lookup table in a database.
 | Session summary | `summaries` | The AI-written coaching summary of one session, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
 | Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, the model that writes summaries, and the email account summaries are sent with (`email`, `null` until set up). |
 
+**Also not in this file:** the width of the review side panel. It is a preference of this
+window on this computer, not library data, so it lives in the renderer's `localStorage`
+(`vod-reviewer:sidebar-width`) and needs no schema version.
+
 **Also not in this file:** frame data. It is reference data downloaded from Dustloop and
 kept as one file per character in `frame-data\` beside the library, where it can be
 deleted and re-downloaded at any time. Move pictures are kept in `frame-data\images\`,

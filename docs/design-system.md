@@ -89,9 +89,13 @@ No fonts are bundled or downloaded; the app uses what Windows ships.
   the one colour outside the game's palette, used only here) and minus frames red. The
   sign is always in the text, so the colour is an aid and not the message. Numbers are
   monospaced so columns line up.
+- **Resizable side panel.** The border between the player and the side panel is a grip:
+  drag it, or focus it and use the arrow keys (Home / End for the limits); double-click
+  returns to the default. It turns accent red on hover, focus and while dragging. The
+  panel is never narrower than 320px and always leaves the player 640px.
 - **Move pictures.** Shown inside the opened row at the panel's width, at most 300px
-  tall, on the darkest ink in both themes: the art and the hitbox overlays are drawn for
-  a dark page. The Move / Hitbox switch is a small two-part toggle in the accent red.
+  tall, with no backing of their own: the wiki's art is transparent, so it sits directly
+  on the row in either theme. The Move / Hitbox switch is a small two-part toggle in the accent red.
 - **Time is always clickable.** Anywhere a timecode appears as a chip, clicking it seeks
   the video there.
 

@@ -397,7 +397,7 @@ async function main() {
 
     step('   frame data: the opponent\'s moves, searchable, with details on demand');
     await page.keyboard.press('f');
-    const frames = page.getByRole('tabpanel', { name: 'Frames' });
+    const frames = page.getByRole('tabpanel', { name: 'Frame data' });
     assert.equal(await frames.getByLabel('Character').inputValue(), 'sol', 'opens on the opponent');
     // Active and recovery are columns only when the sidebar is wide enough.
     await frames.getByRole('row', { name: /c\.S 7 (3 10 )?\+3 \+13/ }).waitFor();
@@ -414,6 +414,40 @@ async function main() {
     await hitbox.waitFor();
     await page.waitForFunction((image) => image.complete && image.naturalWidth > 0, await hitbox.elementHandle());
     await screenshot('05c-frame-data');
+
+    step('   the side panel resizes by keyboard and mouse, and remembers its width');
+    const divider = page.getByRole('separator', { name: 'Resize the side panel' });
+    const sidebarWidth = () => divider.evaluate((element) => element.nextElementSibling.offsetWidth);
+    const storedWidth = () => page.evaluate(() => window.localStorage.getItem('vod-reviewer:sidebar-width'));
+    const defaultWidth = await sidebarWidth();
+    const timeBeforeResize = await videoTime();
+    await divider.focus();
+    await page.keyboard.press('Home');
+    assert.equal(await sidebarWidth(), 320, 'Home makes the panel as narrow as it goes');
+    await page.keyboard.press('ArrowLeft');
+    assert.equal(await sidebarWidth(), 344, 'an arrow key moves the divider one step');
+    assert.equal(await videoTime(), timeBeforeResize, 'arrow keys on the divider do not seek the video');
+    const grip = await divider.boundingBox();
+    await page.mouse.move(grip.x + grip.width / 2, grip.y + 200);
+    await page.mouse.down();
+    await page.mouse.move(grip.x + grip.width / 2 - 30, grip.y + 220, { steps: 4 });
+    await page.mouse.up();
+    assert.ok(Math.abs((await sidebarWidth()) - 374) <= 2, `dragging widens the panel (got ${await sidebarWidth()})`);
+    assert.equal(await storedWidth(), String(await sidebarWidth()), 'the chosen width is remembered');
+    await page.keyboard.press('End');
+    const cutOff = await page.getByLabel('Playback controls').evaluate((bar) =>
+      [...bar.querySelectorAll('button, select, input')]
+        .filter((control) => {
+          const box = control.getBoundingClientRect();
+          return box.width === 0 || box.left < 0 || box.right > window.innerWidth || box.bottom > window.innerHeight;
+        })
+        .map((control) => control.getAttribute('aria-label') ?? control.tagName),
+    );
+    assert.deepEqual(cutOff, [], 'the controls stay visible at the widest panel');
+    await screenshot('05d-sidebar-widest');
+    await divider.dblclick();
+    assert.equal(await sidebarWidth(), defaultWidth, 'double-click returns to the default width');
+    assert.equal(await storedWidth(), null);
     await page.getByRole('tab', { name: /Notes/ }).click();
 
     step('   the scrubber seeks and the picture toggles playback');

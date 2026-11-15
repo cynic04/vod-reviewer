@@ -203,8 +203,6 @@
   display: block;
   width: 100%;
   max-height: 300px;
-  /* The art is drawn for a dark page, whichever theme the app is in. */
-  background: var(--ink-900);
   object-fit: contain;
 }
 

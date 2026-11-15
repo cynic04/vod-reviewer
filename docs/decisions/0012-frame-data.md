@@ -23,7 +23,7 @@ hit, guard, level, invulnerability, notes - with no key and no scraping.
   outside `library.json`: it is downloaded reference data, not the user's. A copy is used
   for a week, then refreshed on next use; the viewer has a refresh button for patch day.
   If a refresh fails, the old copy is served and marked as such, so the app works offline.
-- **In the review screen:** a third sidebar tab, **Frames** (shortcut `F`). It opens on
+- **In the review screen:** a third sidebar tab, **Frame data** (shortcut `F`). It opens on
   the opponent's moves, offers the player's own and every other character, filters by
   input or name, and expands a row for the rest of the data. Advantage is coloured by who
   is ahead. In a narrow sidebar the table shows startup, on block and on hit, and moves

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import type { CSSProperties, ReactNode } from 'react';
 import { Link } from 'react-router-dom';
 import type { Folder, Video } from '@shared/domain/schema';
 import { routes } from '@renderer/app/routes';
@@ -6,6 +6,9 @@ import { Icon } from '@renderer/components/Icon';
 import { folderLabel } from '@renderer/features/characters/characters';
 import { FolderArt } from '@renderer/features/characters/FolderArt';
 import { VideoDate } from '@renderer/features/library/VideoDate';
+import { cx } from '@renderer/lib/cx';
+import { PLAYER_MIN_WIDTH, SIDEBAR_MIN_WIDTH } from './sidebarWidth';
+import { useSidebarResize } from './useSidebarResize';
 import styles from './WorkspaceLayout.module.css';
 
 interface WorkspaceLayoutProps {
@@ -22,6 +25,13 @@ interface WorkspaceLayoutProps {
 
 /** Shared frame of the focus and review screens: video heading, player, and a side panel. */
 export function WorkspaceLayout({ video, folder, banner, actions, children, sidebar }: WorkspaceLayoutProps) {
+  const { bodyRef, sidebarRef, width, dragging, separatorProps } = useSidebarResize();
+  const sizes = {
+    '--sidebar-min': `${String(SIDEBAR_MIN_WIDTH)}px`,
+    '--player-min': `${String(PLAYER_MIN_WIDTH)}px`,
+    ...(width !== null && { '--sidebar-width': `${String(width)}px` }),
+  } as CSSProperties;
+
   return (
     <div className={styles.workspace}>
       {banner && <div className={styles.banner}>{banner}</div>}
@@ -43,9 +53,17 @@ export function WorkspaceLayout({ video, folder, banner, actions, children, side
         {actions && <div className={styles.actions}>{actions}</div>}
       </header>
 
-      <div className={styles.body}>
+      <div className={styles.body} ref={bodyRef} style={sizes}>
         {children}
-        <aside className={styles.sidebar}>{sidebar}</aside>
+        <div
+          {...separatorProps}
+          className={cx(styles.divider, dragging && styles.dragging)}
+          aria-label="Resize the side panel"
+          title="Drag to resize. Double-click to reset."
+        />
+        <aside className={styles.sidebar} ref={sidebarRef}>
+          {sidebar}
+        </aside>
       </div>
     </div>
   );
