@@ -22,7 +22,8 @@
 }
 
 .tab {
-  flex: 1;
+  flex: 1 1 auto;
+  padding: 0 var(--space-2);
   height: 44px;
   border: 0;
   border-bottom: 3px solid transparent;
@@ -30,9 +31,10 @@
   color: var(--color-text-muted);
   font-family: var(--font-display);
   font-style: italic;
-  font-size: 17px;
-  letter-spacing: 0.06em;
+  font-size: 16px;
+  letter-spacing: 0.04em;
   text-transform: uppercase;
+  white-space: nowrap;
   transition: color var(--duration-fast) var(--easing);
 }
 

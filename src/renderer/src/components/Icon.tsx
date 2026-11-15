@@ -37,6 +37,7 @@ const ICON_PATHS = {
     'M11 3l1.9 5.6L18.5 10.5l-5.6 1.9L11 18l-1.9-5.6L3.5 10.5l5.6-1.9zM18.5 15l.8 2.2 2.2.8-2.2.8-.8 2.2-.8-2.2-2.2-.8 2.2-.8z',
   notebook: 'M6 3.5h12v17H6zM9.5 3.5v17M12.5 8h3M12.5 11.5h3',
   mail: 'M3.5 5.5h17v13h-17zM3.5 6l8.5 7 8.5-7',
+  refresh: 'M19.5 12a7.5 7.5 0 1 1-2.2-5.3M19.5 4v4.5H15',
 } as const;
 
 export type IconName = keyof typeof ICON_PATHS;
