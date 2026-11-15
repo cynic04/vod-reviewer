@@ -89,6 +89,11 @@ No fonts are bundled or downloaded; the app uses what Windows ships.
   the one colour outside the game's palette, used only here) and minus frames red. The
   sign is always in the text, so the colour is an aid and not the message. Numbers are
   monospaced so columns line up.
+- **Frame table widths.** In a narrow panel the table has fixed, compact columns and long
+  values wrap. From about 480px of table width (a CSS container query on the panel) the
+  columns size to their content instead, so values such as `Until Landing+10` stay on one
+  line. The opened row's details take no part in that sizing, so opening a move does not
+  move the columns.
 - **Resizable side panel.** The border between the player and the side panel is a grip:
   drag it, or focus it and use the arrow keys (Home / End for the limits); double-click
   returns to the default. It turns accent red on hover, focus and while dragging. The
