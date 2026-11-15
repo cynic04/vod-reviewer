@@ -3,6 +3,7 @@ import path from 'node:path';
 import type { IpcChannel, IpcRequest, IpcResponse } from '@shared/ipc/contract';
 import type { AgentHarness } from '../agent/harness';
 import type { EmailService } from '../email/service';
+import type { FrameDataService } from '../framedata/service';
 import { DomainError, notFound } from '../library/errors';
 import * as operations from '../library/operations';
 import type { LibraryService } from '../library/service';
@@ -22,6 +23,7 @@ export interface IpcHandlerDependencies {
   showItemInFolder: (filePath: string) => void;
   agent: Pick<AgentHarness, 'requestSummary' | 'removeSummary'>;
   email: Pick<EmailService, 'configure' | 'remove' | 'sendTest' | 'sendSummary'>;
+  frameData: Pick<FrameDataService, 'get'>;
 }
 
 export function createIpcHandlers(deps: IpcHandlerDependencies): IpcHandlers {
@@ -121,5 +123,7 @@ export function createIpcHandlers(deps: IpcHandlerDependencies): IpcHandlers {
     'email:sendTest': () => deps.email.sendTest(),
 
     'email:sendSummary': ({ summaryId }) => deps.email.sendSummary(summaryId),
+
+    'frameData:get': ({ characterId, refresh }) => deps.frameData.get(characterId, { refresh }),
   };
 }

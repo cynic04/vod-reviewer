@@ -10,6 +10,8 @@ import { EncryptedFileCredentialStore } from './email/credentials';
 import { createSmtpSender } from './email/mailer';
 import { resolvePortrait } from './email/portraits';
 import { EmailService } from './email/service';
+import { createDustloopFetcher, createDustloopImageFetcher } from './framedata/dustloop';
+import { FrameDataService } from './framedata/service';
 import { createIpcHandlers } from './ipc/handlers';
 import { registerIpcRouter } from './ipc/router';
 import { JsonLibraryRepository } from './library/repository';
@@ -51,7 +53,19 @@ async function bootstrap(): Promise<void> {
   const getVideosRoot = (): string =>
     library.library.settings.videosRoot ?? process.env.VOD_REVIEWER_VIDEOS_ROOT ?? app.getPath('videos');
 
-  handleMediaRequests({ getLibrary: () => library.library, getVideosRoot });
+  const userAgent = `VOD-Reviewer/${app.getVersion()} (personal desktop app)`;
+  const frameData = new FrameDataService({
+    cacheDir: path.join(app.getPath('userData'), 'frame-data'),
+    fetchMoves: createDustloopFetcher(userAgent),
+    fetchImage: createDustloopImageFetcher(userAgent),
+    now: () => new Date(),
+  });
+
+  handleMediaRequests({
+    getLibrary: () => library.library,
+    getVideosRoot,
+    getMoveImage: (fileName) => frameData.getImage(fileName),
+  });
 
   const sendToWindows = (channel: string, payload: unknown): void => {
     for (const window of BrowserWindow.getAllWindows()) window.webContents.send(channel, payload);
@@ -74,6 +88,7 @@ async function bootstrap(): Promise<void> {
     assertAgentAvailable: isAgentDryRun ? () => Promise.resolve() : assertAgentAvailable,
     openTerminal: isAgentDryRun ? () => Promise.resolve() : openTerminal,
     searchYouTube,
+    getFrameData: (characterId) => frameData.get(characterId, { refresh: false }),
     onLibraryChanged: (snapshot) => sendToWindows(LIBRARY_CHANGED_CHANNEL, snapshot),
     // Nobody is waiting on this, so the outcome is reported to the window as a notice.
     onSummarySaved: (summaryId) => {
@@ -107,6 +122,7 @@ async function bootstrap(): Promise<void> {
       showItemInFolder: (filePath) => shell.showItemInFolder(filePath),
       agent,
       email,
+      frameData,
     }),
     (event) => event.senderFrame !== null && isAppUrl(event.senderFrame.url),
   );
