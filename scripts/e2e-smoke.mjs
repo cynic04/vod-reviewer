@@ -260,16 +260,17 @@ async function main() {
     await page.keyboard.press('>');
     assert.equal(await frameAt(), before + 9, 'ten frames forward');
 
-    step('   notes are stored with their position and session');
+    step('   notes are stored with their position, against the video');
     await page.keyboard.press('n');
     const noteTime = await videoTime();
     await page.keyboard.type('Dropped the combo after 6P - practise the route');
     await page.keyboard.press('Control+Enter');
     await page.getByRole('listitem').getByText('Dropped the combo after 6P').waitFor();
     await page.keyboard.press('Escape');
-    const withNote = await expectLibrary((l) => l.notes.length === 1 && l.sessions.length === 1, 'note and session');
+    const withNote = await expectLibrary((l) => l.notes.length === 1, 'note');
     assert.ok(Math.abs(withNote.notes[0].timeSeconds - noteTime) < 0.001, 'note pinned to the playhead');
-    assert.equal(withNote.notes[0].sessionId, withNote.sessions[0].id, 'note belongs to the session');
+    assert.equal(withNote.notes[0].videoId, withNote.videos[0].id, 'note belongs to the video');
+    assert.ok(!('sessions' in withNote) && !('sessionId' in withNote.notes[0]), 'there are no review sessions');
 
     if (mailServer) {
       step('   email: connect an account and receive the test message');
@@ -297,7 +298,7 @@ async function main() {
 
     step('   summarize: the harness briefs the agent and shows the summary it hands in');
     await page.getByRole('button', { name: 'Summarize', exact: true }).click();
-    await page.getByText('Copilot is summarizing this session').waitFor();
+    await page.getByText('Copilot is summarizing these notes').waitFor();
     const agentDir = path.join(USER_DATA_DIR, 'agent');
     const runFiles = await readdir(path.join(agentDir, 'runs'));
     const launcher = await readFile(path.join(agentDir, 'runs', runFiles.find((file) => file.endsWith('.cmd'))), 'utf8');
@@ -318,9 +319,9 @@ async function main() {
     await rpc('initialize', { protocolVersion: '2025-11-25', capabilities: {}, clientInfo: { name: 'e2e', version: '0' } });
     assert.deepEqual(
       (await rpc('tools/list')).tools.map((tool) => tool.name),
-      ['get_review_session', 'frame_data', 'youtube_search', 'save_summary'],
+      ['get_review_notes', 'frame_data', 'youtube_search', 'save_summary'],
     );
-    const brief = JSON.parse(await callTool('get_review_session'));
+    const brief = JSON.parse(await callTool('get_review_notes'));
     assert.equal(brief.matchup.opponent, 'Sol Badguy');
     assert.equal(brief.notes[0].text, 'Dropped the combo after 6P - practise the route');
     assert.match(
@@ -346,9 +347,9 @@ async function main() {
 
     // The agent's save reaches the open window without any request from it.
     await page.getByRole('link', { name: 'View summary' }).click();
-    await page.getByRole('heading', { name: 'Session notes', level: 1 }).waitFor();
-    // Session cards start collapsed: only the header shows until one is opened.
-    const sessionToggle = page.getByRole('button', { name: 'Show session notes for ranked-set' });
+    await page.getByRole('heading', { name: 'Review notes', level: 1 }).waitFor();
+    // Video cards start collapsed: only the header shows until one is opened.
+    const sessionToggle = page.getByRole('button', { name: 'Show notes for ranked-set' });
     assert.equal(await sessionToggle.getAttribute('aria-expanded'), 'false');
     assert.equal(await page.getByRole('heading', { name: 'Overview' }).count(), 0, 'summary is hidden while collapsed');
     await sessionToggle.click();
@@ -356,21 +357,32 @@ async function main() {
     const studyLink = page.getByRole('link', { name: 'Combo guide' });
     assert.equal(await studyLink.getAttribute('target'), '_blank', 'links open outside the app');
     assert.equal(await page.evaluate(() => window.pwned), undefined, 'HTML in a summary is not executed');
-    await screenshot('05a-session-notes');
+    await screenshot('05a-review-notes');
     if (mailServer) {
       await page.getByRole('button', { name: 'Email', exact: true }).click();
       assert.match((await mailServer.nextMail()).text, /## Overview/, 'sent on request, with a plain-text alternative');
     }
-    await page.getByRole('link', { name: 'Session notes', exact: true }).click();
+    await page.getByRole('link', { name: 'Review notes', exact: true }).click();
     // On the page for all matchups, each character is a group that starts collapsed.
     const characterGroup = page.getByRole('heading', { name: 'vs. Sol Badguy', level: 2 }).getByRole('button');
     assert.equal(await characterGroup.getAttribute('aria-expanded'), 'false');
-    assert.equal(await page.getByRole('link', { name: 'ranked-set', exact: true }).count(), 0, 'sessions are hidden while collapsed');
+    assert.equal(await page.getByRole('link', { name: 'ranked-set', exact: true }).count(), 0, 'videos are hidden while collapsed');
     await characterGroup.click();
     assert.equal(await characterGroup.getAttribute('aria-expanded'), 'true');
-    await screenshot('05b-session-notes-all');
+    await screenshot('05b-review-notes-all');
     await page.getByRole('link', { name: 'ranked-set', exact: true }).click();
     await waitForPlayer();
+
+    step('   coming back to a video adds to the same notes, and the summary says what it is missing');
+    await page.getByText('1 note - summarized').waitFor();
+    await page.getByRole('textbox', { name: /^Note at/ }).fill('Came back later: blocked the overhead this time');
+    await page.keyboard.press('Control+Enter');
+    await page.getByRole('listitem').getByText('Came back later').waitFor();
+    await page.keyboard.press('Escape');
+    await page.getByText('2 notes - 1 not in the summary yet').waitFor();
+    const later = await expectLibrary((l) => l.notes.length === 2, 'second note');
+    assert.equal(later.summaries.length, 1, 'still one summary for the video');
+    assert.deepEqual(new Set(later.notes.map((note) => note.videoId)).size, 1);
 
     step('   timestamps jump the video when clicked');
     await page.evaluate(() => {
@@ -385,7 +397,7 @@ async function main() {
 
     step('   notes fold away under the timestamp they belong to');
     await page.getByRole('tab', { name: /Notes/ }).click();
-    const noteGroup = page.getByRole('button', { name: /Round 2 - lost neutral\s*1$/ });
+    const noteGroup = page.getByRole('button', { name: /Round 2 - lost neutral\s*\d$/ });
     const groupedNote = page.getByRole('listitem').getByText('Dropped the combo after 6P');
     await groupedNote.waitFor();
     assert.equal(await noteGroup.getAttribute('aria-expanded'), 'true');
@@ -491,7 +503,7 @@ async function main() {
     await page.getByRole('heading', { name: 'vs. Sol Badguy', level: 1 }).waitFor();
     await page.getByText(`${SAMPLE_AGE_DAYS} days ago`).waitFor();
     assert.equal(await page.getByText('Old video:').count(), 1, 'stale video is flagged');
-    await page.getByText('1 note', { exact: true }).waitFor();
+    await page.getByText('2 notes', { exact: true }).waitFor();
     await page.getByText('2 timestamps').waitFor();
     await screenshot('08-folder-light');
 
@@ -543,7 +555,7 @@ async function main() {
     await page.getByRole('button', { name: 'Remove from library' }).click();
     await page.getByRole('button', { name: 'Remove video' }).click();
     const emptied = await expectLibrary((l) => l.videos.length === 0, 'video removed');
-    assert.deepEqual([emptied.notes, emptied.timestamps, emptied.sessions, emptied.summaries], [[], [], [], []]);
+    assert.deepEqual([emptied.notes, emptied.timestamps, emptied.summaries], [[], [], []]);
     await readFile(path.join(VIDEOS_DIR, SAMPLE_NAME));
 
     assert.deepEqual(errors, [], 'no errors were logged by the renderer');
