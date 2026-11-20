@@ -6,7 +6,6 @@ const at = '2026-11-14T10:00:00.000Z';
 const note = (id: string, timeSeconds: number): Note => ({
   id,
   videoId: 'v',
-  sessionId: 's',
   timeSeconds,
   body: id,
   createdAt: at,

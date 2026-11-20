@@ -40,10 +40,10 @@ export function AppLayout() {
             Library
           </NavLink>
           <NavLink
-            to={routes.sessionNotes()}
+            to={routes.reviewNotes()}
             className={({ isActive }) => cx(styles.navLink, isActive && styles.navLinkActive)}
           >
-            Session notes
+            Review notes
           </NavLink>
         </nav>
 

@@ -210,6 +210,11 @@
   font-weight: 600;
 }
 
+.outdated {
+  color: var(--color-highlight-text);
+  font-weight: 600;
+}
+
 .cardActions {
   display: flex;
   flex: none;

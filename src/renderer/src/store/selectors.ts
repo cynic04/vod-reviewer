@@ -3,10 +3,9 @@ import type {
   Folder,
   Library,
   Note,
-  ReviewSession,
-  SessionSummary,
   Timestamp,
   Video,
+  VideoSummary,
 } from '@shared/domain/schema';
 
 /** Pure read-side queries over the normalised library. */
@@ -35,12 +34,6 @@ export function selectTimestamps(library: Library, videoId: string): Timestamp[]
 
 export function selectNotes(library: Library, videoId: string): Note[] {
   return library.notes.filter((note) => note.videoId === videoId).sort(byTime);
-}
-
-export function selectSessionsById(library: Library, videoId: string): Map<string, ReviewSession> {
-  return new Map(
-    library.sessions.filter((session) => session.videoId === videoId).map((session) => [session.id, session]),
-  );
 }
 
 export interface FolderSummary {
@@ -85,68 +78,74 @@ export function selectAnnotationCounts(library: Library): Map<string, Annotation
   return counts;
 }
 
-export function selectSummaryForSession(library: Library, sessionId: string | null): SessionSummary | undefined {
-  return sessionId === null ? undefined : library.summaries.find((summary) => summary.sessionId === sessionId);
+export function selectSummaryForVideo(library: Library, videoId: string): VideoSummary | undefined {
+  return library.summaries.find((summary) => summary.videoId === videoId);
 }
 
-/** One review session with everything the session notes view shows about it. */
-export interface SessionEntry {
-  session: ReviewSession;
+/** How many notes were written or edited after the summary was asked for, so are not in it. */
+export function countNotesNotInSummary(notes: readonly Note[], summary: VideoSummary | undefined): number {
+  if (!summary) return 0;
+  return notes.filter((note) => note.updatedAt > summary.requestedAt).length;
+}
+
+/** One reviewed video with everything the review notes view shows about it. */
+export interface ReviewEntry {
   video: Video;
   folder: Folder;
-  /** Sorted by position in the video. */
+  /** Every note on the video, sorted by position in it. Never empty. */
   notes: Note[];
-  summary: SessionSummary | undefined;
+  summary: VideoSummary | undefined;
+  /** When the newest note was written. */
+  lastNoteAt: string;
 }
 
-export interface SessionGroup {
+export interface ReviewGroup {
   key: string;
-  /** `null` for the "Miscellaneous" group: sessions on videos that are not filed under a matchup. */
+  /** `null` for the "Miscellaneous" group: videos that are not filed under a matchup. */
   character: Character | null;
-  /** Newest session first. */
-  entries: SessionEntry[];
+  /** Most recently annotated video first. */
+  entries: ReviewEntry[];
 }
 
 const MISCELLANEOUS_KEY = 'miscellaneous';
 
 /**
- * Review sessions grouped by the character of their matchup, in roster order, with
- * everything else under "Miscellaneous" at the end. Pass `folderId` to keep one folder only.
+ * Videos that have notes, grouped by the character of their matchup, in roster order,
+ * with everything else under "Miscellaneous" at the end. Pass `folderId` to keep one
+ * folder only.
  */
-export function selectSessionGroups(library: Library, folderId?: string): SessionGroup[] {
-  const videos = new Map(library.videos.map((video) => [video.id, video]));
+export function selectReviewGroups(library: Library, folderId?: string): ReviewGroup[] {
   const folders = new Map(library.folders.map((folder) => [folder.id, folder]));
-  const summaries = new Map(library.summaries.map((summary) => [summary.sessionId, summary]));
-  const notesBySession = new Map<string, Note[]>();
+  const summaries = new Map(library.summaries.map((summary) => [summary.videoId, summary]));
+  const notesByVideo = new Map<string, Note[]>();
   for (const note of library.notes) {
-    const notes = notesBySession.get(note.sessionId);
+    const notes = notesByVideo.get(note.videoId);
     if (notes) notes.push(note);
-    else notesBySession.set(note.sessionId, [note]);
+    else notesByVideo.set(note.videoId, [note]);
   }
 
-  const entriesByGroup = new Map<string, SessionEntry[]>();
-  for (const session of library.sessions) {
-    const video = videos.get(session.videoId);
-    const folder = video && folders.get(video.folderId);
-    if (!video || !folder || (folderId !== undefined && folder.id !== folderId)) continue;
+  const entriesByGroup = new Map<string, ReviewEntry[]>();
+  for (const video of library.videos) {
+    const notes = notesByVideo.get(video.id);
+    const folder = folders.get(video.folderId);
+    if (!notes || !folder || (folderId !== undefined && folder.id !== folderId)) continue;
 
     const key = getCharacter(folder.characterId)?.id ?? MISCELLANEOUS_KEY;
-    const entry: SessionEntry = {
-      session,
+    const entry: ReviewEntry = {
       video,
       folder,
-      notes: (notesBySession.get(session.id) ?? []).sort(byTime),
-      summary: summaries.get(session.id),
+      notes: notes.sort(byTime),
+      summary: summaries.get(video.id),
+      lastNoteAt: notes.reduce((latest, note) => (note.createdAt > latest ? note.createdAt : latest), ''),
     };
     const entries = entriesByGroup.get(key);
     if (entries) entries.push(entry);
     else entriesByGroup.set(key, [entry]);
   }
 
-  const newestFirst = (a: SessionEntry, b: SessionEntry): number =>
-    b.session.startedAt.localeCompare(a.session.startedAt);
+  const newestFirst = (a: ReviewEntry, b: ReviewEntry): number => b.lastNoteAt.localeCompare(a.lastNoteAt);
 
-  const groups: SessionGroup[] = [];
+  const groups: ReviewGroup[] = [];
   for (const character of CHARACTERS) {
     const entries = entriesByGroup.get(character.id);
     if (entries) groups.push({ key: character.id, character, entries: entries.sort(newestFirst) });
