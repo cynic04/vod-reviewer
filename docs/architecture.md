@@ -61,7 +61,7 @@ src/
       review/        step 4: the main review workspace
       player/        the media player (hooks + components)
       annotations/   notes and timestamps
-      session-notes/ AI summaries of review sessions, grouped by character
+      review-notes/  each video's notes and AI summary, grouped by character
       email/         email setup dialog and the "Email" button
       frame-data/    the Frame data tab of the review screen
       characters/    portraits and folder labels
@@ -111,10 +111,10 @@ automatically, or failing to - arrive the same way as a `Notice` and are shown a
 
 ## The summarize agent
 
-Session summaries are written by the GitHub Copilot CLI, which the app starts in a
+Summaries are written by the GitHub Copilot CLI, which the app starts in a
 terminal window and serves through a loopback MCP endpoint with three narrow tools. The
 agent is treated as untrusted in the same way the renderer is: it gets no file access and
-can only read one session and write one summary. The details are in
+can only read one video's notes and write one summary. The details are in
 [agent-harness.md](agent-harness.md).
 
 ## The IPC contract

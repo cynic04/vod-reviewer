@@ -61,11 +61,11 @@ export function buildLauncherScript(options: LauncherOptions): string {
 
   return [
     '@echo off',
-    'title VOD Reviewer - Summarize session',
+    'title VOD Reviewer - Summarize review',
     `cd /d ${quoteForBatch(options.workspaceDir)}`,
     'echo.',
-    `echo   VOD Reviewer is summarizing your review session with GitHub Copilot (${options.model}).`,
-    'echo   The summary will appear in the app under Session notes when it is done.',
+    `echo   VOD Reviewer is summarizing your review notes with GitHub Copilot (${options.model}).`,
+    'echo   The summary will appear in the app under Review notes when it is done.',
     'echo.',
     `copilot ${args}`,
     'if errorlevel 1 (',

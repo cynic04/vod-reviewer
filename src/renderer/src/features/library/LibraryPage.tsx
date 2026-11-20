@@ -47,8 +47,8 @@ export function LibraryPage() {
         <div className={styles.sectionHeader}>
           <h2 id="matchups-title">Matchups</h2>
           <p>{library.videos.length === 1 ? '1 video' : `${library.videos.length} videos`} in your library</p>
-          <Button icon="notebook" onClick={() => void navigate(routes.sessionNotes())}>
-            Session notes
+          <Button icon="notebook" onClick={() => void navigate(routes.reviewNotes())}>
+            Review notes
           </Button>
         </div>
         <ul className={styles.matchups}>

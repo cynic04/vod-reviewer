@@ -111,7 +111,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
               </option>
             ))}
           </select>
-          <p>Lets session summaries look for footage and advice for your side of each matchup.</p>
+          <p>Lets summaries look for footage and advice for your side of each matchup.</p>
         </div>
 
         <div className={styles.field}>
@@ -133,7 +133,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
             <option value="auto" />
           </datalist>
           <p>
-            The GitHub Copilot model that writes session summaries. A small model keeps the cost down;
+            The GitHub Copilot model that writes summaries. A small model keeps the cost down;
             default: {DEFAULT_SUMMARY_MODEL}.
           </p>
         </div>
@@ -151,7 +151,7 @@ export function SettingsDialog({ onClose }: SettingsDialogProps) {
           <p>
             {settings.email?.autoSend
               ? 'Each summary is emailed automatically as soon as it is written.'
-              : 'Send a summary, your notes and its study videos to your phone from Session notes.'}
+              : 'Send a summary, your notes and its study videos to your phone from Review notes.'}
           </p>
         </div>
 

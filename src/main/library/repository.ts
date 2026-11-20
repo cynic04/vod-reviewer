@@ -58,7 +58,40 @@ const MIGRATIONS: Record<number, (library: RawLibrary) => RawLibrary> = {
     schemaVersion: 3,
     settings: { ...(typeof library.settings === 'object' ? library.settings : {}), email: null },
   }),
+  // 4: review sessions are gone. Notes belong to their video only, and a video has one summary.
+  3: (library) => ({
+    ...without(library, 'sessions'),
+    schemaVersion: 4,
+    notes: records(library.notes).map((note) => without(note, 'sessionId')),
+    summaries: onePerVideo(records(library.summaries).map((summary) => without(summary, 'sessionId'))),
+  }),
 };
+
+type RawRecord = Record<string, unknown>;
+
+function without<T extends RawRecord>(record: T, key: string): T {
+  return Object.fromEntries(Object.entries(record).filter(([name]) => name !== key)) as T;
+}
+
+function records(value: unknown): RawRecord[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((item): item is RawRecord => typeof item === 'object' && item !== null);
+}
+
+/**
+ * Where a video had a summary for each of several sessions, keeps the one written last:
+ * it is the nearest thing to a summary of all the video's notes.
+ */
+function onePerVideo(summaries: RawRecord[]): RawRecord[] {
+  const writtenAt = (summary: RawRecord): string =>
+    [summary.completedAt, summary.requestedAt].find((value) => typeof value === 'string') ?? '';
+  const kept = new Map<unknown, RawRecord>();
+  for (const summary of summaries) {
+    const current = kept.get(summary.videoId);
+    if (!current || writtenAt(summary) > writtenAt(current)) kept.set(summary.videoId, summary);
+  }
+  return [...kept.values()];
+}
 
 function isRawLibrary(raw: unknown): raw is RawLibrary {
   return typeof raw === 'object' && raw !== null && 'schemaVersion' in raw && typeof raw.schemaVersion === 'number';
@@ -100,7 +133,16 @@ export class JsonLibraryRepository implements LibraryRepository {
     }
 
     try {
-      return librarySchema.parse(migrate(JSON.parse(contents)));
+      const raw: unknown = JSON.parse(contents);
+      const library = librarySchema.parse(migrate(raw));
+      // A migration can drop data the newer schema has no place for; keep the file as it was.
+      if (isRawLibrary(raw) && raw.schemaVersion < LIBRARY_SCHEMA_VERSION) {
+        const backupPath = this.#filePath.replace(/\.json$/, `.v${String(raw.schemaVersion)}-backup.json`);
+        await writeFile(backupPath, contents, { encoding: 'utf8', flag: 'wx' }).catch((error: unknown) => {
+          if (!isNodeError(error) || error.code !== 'EEXIST') throw error;
+        });
+      }
+      return library;
     } catch (error) {
       // Never overwrite a file we could not read: set it aside so nothing is lost.
       const backupPath = this.#filePath.replace(/\.json$/, `.unreadable-${Date.now()}.json`);

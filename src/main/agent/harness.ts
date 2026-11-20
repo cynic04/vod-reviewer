@@ -3,7 +3,7 @@ import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import path from 'node:path';
 import type { CharacterFrameData } from '@shared/domain/frameData';
-import type { Library, SessionSummary } from '@shared/domain/schema';
+import type { Library, VideoSummary } from '@shared/domain/schema';
 import summarizeSkill from '../../../resources/agent/skills/summarize/SKILL.md?raw';
 import { removeSummary, requestSummary } from '../library/operations';
 import type { LibraryService } from '../library/service';
@@ -34,7 +34,7 @@ export interface AgentHarnessDependencies {
  *
  * The agent is the GitHub Copilot CLI in a terminal window, started with the `/summarize`
  * skill. It gets no access to the library file: instead the app serves four tools to it
- * over a loopback MCP endpoint that exists only for that run - read the session, look up
+ * over a loopback MCP endpoint that exists only for that run - read the notes, look up
  * frame data, search YouTube, hand in the summary. See docs/agent-harness.md.
  */
 export class AgentHarness {
@@ -66,13 +66,13 @@ export class AgentHarness {
     this.#server = null;
   }
 
-  /** Opens a pending summary for the session and starts an agent run to fill it in. */
-  async requestSummary(sessionId: string): Promise<{ library: Library; summary: SessionSummary }> {
+  /** Opens a pending summary of the video's notes and starts an agent run to fill it in. */
+  async requestSummary(videoId: string): Promise<{ library: Library; summary: VideoSummary }> {
     const { library } = this.#deps;
     await this.#deps.assertAgentAvailable();
 
     const summary = await library.mutate((current) => {
-      const next = requestSummary(current, sessionId, library.context);
+      const next = requestSummary(current, videoId, library.context);
       return { library: next.library, result: next.summary };
     });
 
@@ -95,7 +95,7 @@ export class AgentHarness {
   }
 
   /** Writes the skill, the MCP configuration and the launcher script for one run. */
-  async #prepareRun(summary: SessionSummary): Promise<string> {
+  async #prepareRun(summary: VideoSummary): Promise<string> {
     const address = this.#server?.address() as AddressInfo | null | undefined;
     if (!address) throw new Error('The agent endpoint is not running.');
 

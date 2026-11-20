@@ -46,7 +46,7 @@ function testContext(): OperationContext {
   return { now: () => new Date('2026-11-14T10:00:00.000Z'), newId: () => `id-${(counter += 1)}` };
 }
 
-/** A library with one summarized session vs. Sol (or in a custom folder). */
+/** A library with one summarized video vs. Sol (or in a custom folder). */
 function summarizedLibrary(options: { customFolder?: boolean } = {}): { library: Library; summaryId: string } {
   const ctx = testContext();
   let library = updateSettings(createEmptyLibrary(ctx), { playerCharacterId: 'mll' });
@@ -67,13 +67,13 @@ function summarizedLibrary(options: { customFolder?: boolean } = {}): { library:
     ctx,
   );
   const videoId = imported.video.id;
-  const first = createNote(imported.library, { videoId, sessionId: null, timeSeconds: 125, body: 'Never anti-aired <him>' }, ctx);
+  const first = createNote(imported.library, { videoId, timeSeconds: 125, body: 'Never anti-aired <him>' }, ctx);
   const second = createNote(
     first.library,
-    { videoId, sessionId: first.note.sessionId, timeSeconds: 14, body: 'Jumped in,\ngot 6P again' },
+    { videoId, timeSeconds: 14, body: 'Jumped in,\ngot 6P again' },
     ctx,
   );
-  const requested = requestSummary(second.library, first.note.sessionId, ctx);
+  const requested = requestSummary(second.library, videoId, ctx);
   return {
     library: completeSummary(requested.library, requested.summary.id, SUMMARY, ctx),
     summaryId: requested.summary.id,
@@ -143,9 +143,9 @@ describe('summary email content', () => {
     expect(html).toContain('&lt;img src=x onerror=');
   });
 
-  it('refuses a session that has no summary text', () => {
+  it('refuses a video that has no summary text', () => {
     const { library, summaryId } = summarizedLibrary();
-    const pending = requestSummary(library, library.sessions[0]?.id ?? '', testContext());
+    const pending = requestSummary(library, library.videos[0]?.id ?? '', testContext());
     const empty = { ...pending.library, summaries: [{ ...pending.summary, markdown: '' }] };
     expect(() => buildSummaryEmail(empty, pending.summary.id, portraitOf)).toThrow(/not been summarized/);
     expect(() => buildSummaryEmail(library, 'missing', portraitOf)).toThrow(/does not exist/);

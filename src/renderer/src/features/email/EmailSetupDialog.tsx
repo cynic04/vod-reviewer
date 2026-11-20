@@ -17,7 +17,7 @@ interface EmailSetupDialogProps {
 type Status = { kind: 'idle' } | { kind: 'busy' } | { kind: 'done'; message: string } | { kind: 'error'; message: string };
 
 /**
- * Connects the email account that sends session summaries. The password goes straight
+ * Connects the email account that sends summaries. The password goes straight
  * to the main process, which stores it encrypted; it is never kept in this window.
  */
 export function EmailSetupDialog({ onClose }: EmailSetupDialogProps) {
@@ -111,7 +111,7 @@ export function EmailSetupDialog({ onClose }: EmailSetupDialogProps) {
     >
       <form id={formId} className={styles.form} onSubmit={onSubmit}>
         <p className={styles.intro}>
-          Session summaries are emailed from your own account, so they reach your phone like any other mail.
+          Summaries are emailed from your own account, so they reach your phone like any other mail.
         </p>
 
         <div className={styles.field}>

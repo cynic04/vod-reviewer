@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { Library, Note, SessionSummary, Timestamp, Video } from '@shared/domain/schema';
+import type { Library, Note, VideoSummary, Timestamp, Video } from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { errorMessage, invoke } from '@renderer/lib/api';
 import { useToastStore } from './toastStore';
@@ -36,8 +36,8 @@ interface LibraryState {
   updateNote: (id: string, body: string) => Promise<void>;
   removeNote: (id: string) => Promise<void>;
 
-  /** Starts the summarize agent for a session; the summary arrives later as a pushed update. */
-  requestSummary: (sessionId: string) => Promise<SessionSummary>;
+  /** Starts the summarize agent on a video's notes; the summary arrives later as a pushed update. */
+  requestSummary: (videoId: string) => Promise<VideoSummary>;
   /** Cancels a pending summary or deletes a finished one. */
   removeSummary: (id: string) => Promise<void>;
 
@@ -109,8 +109,8 @@ export const useLibraryStore = create<LibraryState>((set) => {
     updateNote: async (id, body) => replace(await invoke('notes:update', { id, body })),
     removeNote: async (id) => replace(await invoke('notes:remove', { id })),
 
-    requestSummary: async (sessionId) => {
-      const { library, summary } = await invoke('summaries:request', { sessionId });
+    requestSummary: async (videoId) => {
+      const { library, summary } = await invoke('summaries:request', { videoId });
       replace(library);
       return summary;
     },

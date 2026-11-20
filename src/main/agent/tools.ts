@@ -5,14 +5,14 @@ import type { Library } from '@shared/domain/schema';
 import { completeSummary } from '../library/operations';
 import type { LibraryService } from '../library/service';
 import { formatFrameData } from '../framedata/format';
-import { buildSessionBrief, matchupCharacterIds } from './brief';
+import { buildReviewBrief, matchupCharacterIds } from './brief';
 import { defineTool, type McpTool } from './mcp';
 import { formatYouTubeResults, type YouTubeSearchPeriod, type YouTubeVideo } from './youtube';
 
 /** Name the MCP server is registered under; the agent sees tools as `<server>-<tool>`. */
 export const AGENT_SERVER_NAME = 'vod-reviewer';
 
-export const AGENT_TOOL_NAMES = ['get_review_session', 'frame_data', 'youtube_search', 'save_summary'] as const;
+export const AGENT_TOOL_NAMES = ['get_review_notes', 'frame_data', 'youtube_search', 'save_summary'] as const;
 
 /** A run that searches more than this is looping, not researching. */
 const MAX_SEARCHES_PER_RUN = 8;
@@ -29,7 +29,7 @@ export interface AgentToolDependencies {
 
 /**
  * The tools one agent run may use. They are bound to a single summary: the agent cannot
- * name a session, read anything else in the library, look up characters outside the
+ * name a video, read anything else in the library, look up characters outside the
  * matchup, or write anywhere but that summary.
  */
 export function createAgentTools(summaryId: string, deps: AgentToolDependencies): McpTool[] {
@@ -37,11 +37,11 @@ export function createAgentTools(summaryId: string, deps: AgentToolDependencies)
 
   return [
     defineTool({
-      name: 'get_review_session',
+      name: 'get_review_notes',
       description:
-        'Returns the review session to summarize as JSON: the matchup, the video, the notes the player wrote (each with its time in the video) and the moments they flagged. Call this first.',
+        'Returns the review to summarize as JSON: the matchup, the video, every note the player wrote on it (each with its time in the video) and the moments they flagged. Call this first.',
       input: z.object({}),
-      run: () => JSON.stringify(buildSessionBrief(deps.library.library, summaryId), null, 2),
+      run: () => JSON.stringify(buildReviewBrief(deps.library.library, summaryId), null, 2),
     }),
 
     defineTool({
@@ -109,7 +109,7 @@ export function createAgentTools(summaryId: string, deps: AgentToolDependencies)
         );
         deps.onLibraryChanged(library);
         deps.onSummarySaved?.(summaryId);
-        return 'Saved. The summary is now in VOD Reviewer under Session notes.';
+        return 'Saved. The summary is now in VOD Reviewer under Review notes.';
       },
     }),
   ];

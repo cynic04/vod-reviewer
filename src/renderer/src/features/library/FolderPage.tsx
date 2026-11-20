@@ -73,8 +73,8 @@ function FolderContents({ folder }: { folder: Folder }) {
                 <IconButton icon="trash" label="Delete folder" onClick={() => setDialog({ kind: 'deleteFolder' })} />
               </>
             )}
-            <Button icon="notebook" onClick={() => void navigate(routes.sessionNotes(folder.id))}>
-              Session notes
+            <Button icon="notebook" onClick={() => void navigate(routes.reviewNotes(folder.id))}>
+              Review notes
             </Button>
             <Button variant="primary" icon="plus" onClick={addVideo}>
               Add video

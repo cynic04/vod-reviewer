@@ -17,8 +17,7 @@ import { useLibraryStore } from '@renderer/store/libraryStore';
 import {
   selectFolder,
   selectNotes,
-  selectSessionsById,
-  selectSummaryForSession,
+  selectSummaryForVideo,
   selectTimestamps,
   selectVideo,
 } from '@renderer/store/selectors';
@@ -39,7 +38,7 @@ export function ReviewPage() {
   const { videoId } = useParams();
   const video = selectVideo(useLibrary(), videoId);
   if (!video) return <Navigate to={routes.library()} replace />;
-  // Keyed so that switching videos starts from a clean player and a new review session.
+  // Keyed so that switching videos starts from a clean player.
   return <ReviewWorkspace key={video.id} video={video} />;
 }
 
@@ -52,7 +51,6 @@ function ReviewWorkspace({ video }: { video: Video }) {
   const folder = selectFolder(library, video.folderId);
   const timestamps = useMemo(() => selectTimestamps(library, video.id), [library, video.id]);
   const notes = useMemo(() => selectNotes(library, video.id), [library, video.id]);
-  const sessions = useMemo(() => selectSessionsById(library, video.id), [library, video.id]);
   const markers = useMemo(() => toTimelineMarkers(timestamps, notes), [timestamps, notes]);
 
   const [tab, setTab] = useState<SidebarTab>('notes');
@@ -64,9 +62,6 @@ function ReviewWorkspace({ video }: { video: Video }) {
     if (next === 'frames') setHasOpenedFrames(true);
   }, []);
   const [noteFocusRequest, setNoteFocusRequest] = useState(0);
-  const [startedSessionId, setStartedSessionId] = useState<string | null>(null);
-  // A session disappears when its last note is deleted; the next note then opens a new one.
-  const currentSessionId = startedSessionId !== null && sessions.has(startedSessionId) ? startedSessionId : null;
 
   // Open on the first focus point: that is where the user said the review should start.
   const hasJumpedToFocus = useRef(false);
@@ -136,13 +131,10 @@ function ReviewWorkspace({ video }: { video: Video }) {
               videoId={video.id}
               notes={notes}
               timestamps={timestamps}
-              sessions={sessions}
-              currentSessionId={currentSessionId}
-              onSessionStarted={setStartedSessionId}
               player={player}
               focusRequest={noteFocusRequest}
-              summary={selectSummaryForSession(library, currentSessionId)}
-              sessionNotesHref={routes.sessionNotes(video.folderId)}
+              summary={selectSummaryForVideo(library, video.id)}
+              reviewNotesHref={routes.reviewNotes(video.folderId)}
             />
           </div>
 

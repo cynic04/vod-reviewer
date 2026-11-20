@@ -51,11 +51,75 @@ describe('JSON library persistence', () => {
 
     const loaded = await new JsonLibraryRepository(filePath).load();
     expect(loaded).toMatchObject({
-      schemaVersion: 3,
+      schemaVersion: 4,
       settings: { theme: 'dark', playerCharacterId: null, summaryModel: 'claude-haiku-4.5', email: null },
       summaries: [],
     });
     expect(loaded?.folders).toEqual(current.folders);
+    expect(loaded).not.toHaveProperty('sessions');
+  });
+
+  it('merges review sessions into their video, keeping a copy of the old file', async () => {
+    const at = (minute: number): string => `2026-11-14T10:${String(minute).padStart(2, '0')}:00.000Z`;
+    const note = (id: string, sessionId: string): object => ({
+      id,
+      videoId: 'v1',
+      sessionId,
+      timeSeconds: 1,
+      body: id,
+      createdAt: at(0),
+      updatedAt: at(0),
+    });
+    const summary = (id: string, sessionId: string, minute: number): object => ({
+      id,
+      sessionId,
+      videoId: 'v1',
+      status: 'ready',
+      markdown: id,
+      model: 'claude-haiku-4.5',
+      requestedAt: at(minute),
+      completedAt: at(minute + 1),
+    });
+    const current = createEmptyLibrary(ctx);
+    const v3 = {
+      ...current,
+      schemaVersion: 3,
+      videos: [
+        {
+          id: 'v1',
+          folderId: current.folders[0]?.id,
+          filePath: 'C:\\a.mp4',
+          fileName: 'a.mp4',
+          title: 'a',
+          fileSizeBytes: 1,
+          recordedAt: at(0),
+          importedAt: at(0),
+          durationSeconds: null,
+          frameRate: 60,
+          frameRateSource: 'default',
+        },
+      ],
+      sessions: [
+        { id: 's1', videoId: 'v1', startedAt: at(0), lastActivityAt: at(0) },
+        { id: 's2', videoId: 'v1', startedAt: at(5), lastActivityAt: at(5) },
+      ],
+      notes: [note('n1', 's1'), note('n2', 's2')],
+      summaries: [summary('newer', 's2', 20), summary('older', 's1', 10)],
+    };
+    const written = JSON.stringify(v3);
+    await writeFile(filePath, written, 'utf8');
+
+    const repository = new JsonLibraryRepository(filePath);
+    const loaded = await repository.load();
+
+    expect(loaded?.notes.map((item) => item.id)).toEqual(['n1', 'n2']);
+    expect(loaded?.notes[0]).not.toHaveProperty('sessionId');
+    expect(loaded?.summaries.map((item) => item.id)).toEqual(['newer']);
+    expect(await readFile(path.join(directory, 'library.v3-backup.json'), 'utf8')).toBe(written);
+
+    // Loading again must not replace the copy of the original.
+    await repository.load();
+    expect(await readFile(path.join(directory, 'library.v3-backup.json'), 'utf8')).toBe(written);
   });
 
   it('refuses a library from a newer version without touching it', async () => {

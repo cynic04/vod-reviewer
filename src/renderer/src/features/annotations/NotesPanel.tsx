@@ -1,13 +1,14 @@
 import { useEffect, useMemo, useRef, useState, type SyntheticEvent } from 'react';
 import { Link } from 'react-router-dom';
-import type { Note, ReviewSession, SessionSummary, Timestamp } from '@shared/domain/schema';
+import type { Note, Timestamp, VideoSummary } from '@shared/domain/schema';
 import { formatTimecode } from '@shared/domain/time';
 import { Button, IconButton } from '@renderer/components/Button';
 import { Icon } from '@renderer/components/Icon';
 import { cx } from '@renderer/lib/cx';
 import { formatDateTime } from '@renderer/lib/dates';
 import { useActiveItemId, type Player } from '@renderer/features/player/usePlayer';
-import { SummarizeButton } from '@renderer/features/session-notes/SummarizeButton';
+import { SummarizeButton } from '@renderer/features/review-notes/SummarizeButton';
+import { countNotesNotInSummary } from '@renderer/store/selectors';
 import { useLibraryStore } from '@renderer/store/libraryStore';
 import { reportError } from '@renderer/store/toastStore';
 import { groupNotesByTimestamp } from './noteGroups';
@@ -20,61 +21,48 @@ interface NotesPanelProps {
   notes: readonly Note[];
   /** The video's timestamps, sorted by time. When there are any, notes are grouped under them. */
   timestamps: readonly Timestamp[];
-  sessions: ReadonlyMap<string, ReviewSession>;
-  /** The session notes are currently being added to, or `null` before the first note. */
-  currentSessionId: string | null;
-  onSessionStarted: (sessionId: string) => void;
   player: Player;
   /** Increment to move keyboard focus into the composer. */
   focusRequest: number;
-  /** Summary of the current session, if one was requested. */
-  summary: SessionSummary | undefined;
-  /** Where the session notes of this video's folder are shown. */
-  sessionNotesHref: string;
+  /** Summary of this video's notes, if one was requested. */
+  summary: VideoSummary | undefined;
+  /** Where the notes and summaries of this video's folder are shown. */
+  reviewNotesHref: string;
 }
 
 export function NotesPanel({
   videoId,
   notes,
-  sessions,
-  currentSessionId,
-  onSessionStarted,
   player,
   focusRequest,
   summary,
-  sessionNotesHref,
+  reviewNotesHref,
   timestamps,
 }: NotesPanelProps) {
-  const sessionNoteCount = notes.filter((note) => note.sessionId === currentSessionId).length;
+  const notInSummary = countNotesNotInSummary(notes, summary);
 
   return (
     <div className={styles.panel}>
-      <NoteComposer
-        videoId={videoId}
-        sessionId={currentSessionId}
-        onSessionStarted={onSessionStarted}
-        player={player}
-        focusRequest={focusRequest}
-      />
+      <NoteComposer videoId={videoId} player={player} focusRequest={focusRequest} />
 
-      <div className={styles.sessionBar}>
+      <div className={styles.summaryBar}>
         <p>
-          {currentSessionId === null ? (
-            'Notes you write now start a new session.'
+          {notes.length === 0 ? (
+            'Every note on this video goes into one summary.'
           ) : summary?.status === 'pending' ? (
-            <span role="status">Copilot is summarizing this session in the terminal window.</span>
+            <span role="status">Copilot is summarizing these notes in the terminal window.</span>
           ) : (
             <>
-              <strong>This session:</strong> {sessionNoteCount === 1 ? '1 note' : `${sessionNoteCount} notes`}
-              {summary && ' - summarized'}
+              <strong>{notes.length === 1 ? '1 note' : `${notes.length} notes`}</strong>
+              {summary && (notInSummary === 0 ? ' - summarized' : ` - ${notInSummary} not in the summary yet`)}
             </>
           )}
         </p>
-        <div className={styles.sessionActions}>
-          <Link to={sessionNotesHref} className={styles.sessionLink}>
-            {summary?.status === 'ready' ? 'View summary' : 'Session notes'}
+        <div className={styles.summaryActions}>
+          <Link to={reviewNotesHref} className={styles.summaryLink}>
+            {summary?.status === 'ready' ? 'View summary' : 'Review notes'}
           </Link>
-          {currentSessionId !== null && <SummarizeButton sessionId={currentSessionId} summary={summary} />}
+          {notes.length > 0 && <SummarizeButton videoId={videoId} summary={summary} />}
         </div>
       </div>
 
@@ -83,26 +71,21 @@ export function NotesPanel({
           No notes yet. Pause on a moment worth remembering and write down what happened.
         </p>
       ) : (
-        <NoteList
-          notes={notes}
-          timestamps={timestamps}
-          sessions={sessions}
-          currentSessionId={currentSessionId}
-          player={player}
-        />
+        <NoteList notes={notes} timestamps={timestamps} player={player} />
+
       )}
     </div>
   );
 }
 
-type NoteListProps = Pick<NotesPanelProps, 'notes' | 'timestamps' | 'sessions' | 'currentSessionId' | 'player'>;
+type NoteListProps = Pick<NotesPanelProps, 'notes' | 'timestamps' | 'player'>;
 
 /**
  * The notes, in video order. When the video has timestamps they divide the list into
  * collapsible sections, one per timestamp, so a long review can be folded down to the
  * part being worked on.
  */
-function NoteList({ notes, timestamps, sessions, currentSessionId, player }: NoteListProps) {
+function NoteList({ notes, timestamps, player }: NoteListProps) {
   const activeId = useActiveItemId(player, notes);
   const groups = useMemo(() => groupNotesByTimestamp(notes, timestamps), [notes, timestamps]);
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
@@ -110,14 +93,8 @@ function NoteList({ notes, timestamps, sessions, currentSessionId, player }: Not
   const renderNotes = (items: readonly Note[], id?: string) => (
     <ol className={styles.list} id={id}>
       {items.map((note) => (
-        <NoteItem
-          key={note.id}
-          note={note}
-          session={sessions.get(note.sessionId)}
-          isCurrentSession={note.sessionId === currentSessionId}
-          isActive={note.id === activeId}
-          onJump={player.seek}
-        />
+        <NoteItem key={note.id} note={note} isActive={note.id === activeId} onJump={player.seek} />
+
       ))}
     </ol>
   );
@@ -185,12 +162,9 @@ function NoteList({ notes, timestamps, sessions, currentSessionId, player }: Not
   );
 }
 
-interface NoteComposerProps
-  extends Pick<NotesPanelProps, 'videoId' | 'onSessionStarted' | 'player' | 'focusRequest'> {
-  sessionId: string | null;
-}
+type NoteComposerProps = Pick<NotesPanelProps, 'videoId' | 'player' | 'focusRequest'>;
 
-function NoteComposer({ videoId, sessionId, onSessionStarted, player, focusRequest }: NoteComposerProps) {
+function NoteComposer({ videoId, player, focusRequest }: NoteComposerProps) {
   const createNote = useLibraryStore((state) => state.createNote);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [body, setBody] = useState('');
@@ -210,11 +184,10 @@ function NoteComposer({ videoId, sessionId, onSessionStarted, player, focusReque
   const save = (): void => {
     const trimmed = body.trim();
     if (trimmed === '') return;
-    createNote({ videoId, sessionId, body: trimmed, timeSeconds: pinnedTime ?? player.getCurrentTime() })
-      .then((note) => {
+    createNote({ videoId, body: trimmed, timeSeconds: pinnedTime ?? player.getCurrentTime() })
+      .then(() => {
         setBody('');
         setPinnedTime(null);
-        onSessionStarted(note.sessionId);
       })
       .catch(reportError);
   };
@@ -259,13 +232,11 @@ function NoteComposer({ videoId, sessionId, onSessionStarted, player, focusReque
 
 interface NoteItemProps {
   note: Note;
-  session: ReviewSession | undefined;
-  isCurrentSession: boolean;
   isActive: boolean;
   onJump: (timeSeconds: number) => void;
 }
 
-function NoteItem({ note, session, isCurrentSession, isActive, onJump }: NoteItemProps) {
+function NoteItem({ note, isActive, onJump }: NoteItemProps) {
   const updateNote = useLibraryStore((state) => state.updateNote);
   const removeNote = useLibraryStore((state) => state.removeNote);
   const [draft, setDraft] = useState<string | null>(null);
@@ -294,8 +265,8 @@ function NoteItem({ note, session, isCurrentSession, isActive, onJump }: NoteIte
         >
           {timecode}
         </button>
-        <span className={cx(styles.session, isCurrentSession && styles.currentSession)}>
-          {isCurrentSession ? 'This session' : session ? `Session ${formatDateTime(session.startedAt)}` : ''}
+        <span className={styles.noteDate} title="When this note was written">
+          {formatDateTime(note.createdAt)}
         </span>
         {draft === null && (
           <>

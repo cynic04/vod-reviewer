@@ -18,11 +18,8 @@ erDiagram
     CHARACTER |o--|| FOLDER : "has one matchup folder"
     FOLDER ||--o{ VIDEO : "contains"
     VIDEO ||--o{ TIMESTAMP : "is marked by"
-    VIDEO ||--o{ REVIEW_SESSION : "is reviewed in"
     VIDEO ||--o{ NOTE : "is annotated by"
-    REVIEW_SESSION ||--|{ NOTE : "produces"
-    REVIEW_SESSION ||--o| SESSION_SUMMARY : "is summarized by"
-    VIDEO ||--o{ SESSION_SUMMARY : "has"
+    VIDEO ||--o| VIDEO_SUMMARY : "is summarized by"
     CHARACTER |o--o| SETTINGS : "is the player's character in"
 
     CHARACTER {
@@ -59,25 +56,18 @@ erDiagram
         string kind "focus | bookmark"
         datetime created_at
     }
-    REVIEW_SESSION {
-        string id PK
-        string video_id FK
-        datetime started_at
-        datetime last_activity_at
-    }
+
     NOTE {
         string id PK
         string video_id FK
-        string session_id FK
         float time_seconds
         string body
         datetime created_at
         datetime updated_at
     }
-    SESSION_SUMMARY {
+    VIDEO_SUMMARY {
         string id PK
-        string session_id FK "unique: one summary per session"
-        string video_id FK
+        string video_id FK "unique: one summary per video"
         string status "pending | ready"
         text markdown "written by the summarize agent"
         string model "Copilot model that wrote it"
@@ -109,9 +99,8 @@ stored in `library.json`, but it would be a seeded lookup table in a database.
 | Folder | `folders` | Where a video is filed. One built-in `matchup` folder per character (id `matchup-<characterId>`), plus any `custom` folders the user creates. |
 | Video | `videos` | A recording on disk that was added to the library. Belongs to exactly one folder. |
 | Timestamp | `timestamps` | A named position in a video. `focus` points are set in the import flow ("where should this review concentrate?"); `bookmark`s are added while reviewing. Clicking one seeks the video. |
-| Review session | `sessions` | One sitting of note-taking on a video. Created with the first note written after opening the review screen. |
-| Note | `notes` | Free text pinned to a position in a video, written during a session. |
-| Session summary | `summaries` | The AI-written coaching summary of one session, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
+| Note | `notes` | Free text pinned to a position in a video, All of a video's notes form one set, whenever they were written. |
+| Video summary | `summaries` | The AI-written coaching summary of all the notes on one video, as markdown. `pending` while the agent is working; see [agent-harness.md](agent-harness.md). |
 | Settings | `settings` | Theme, the import browser's root folder, the "old video" threshold, the character the user plays, the model that writes summaries, and the email account summaries are sent with (`email`, `null` until set up). |
 
 **Also not in this file:** the width of the review side panel. It is a preference of this
@@ -141,30 +130,29 @@ unit-tested. In a database most of them become constraints.
 | Folder names are unique, ignoring case. | `UNIQUE (lower(name))` |
 | Matchup folders cannot be renamed or deleted. | Application rule / trigger on `kind = 'matchup'` |
 | A custom folder can only be deleted when empty. | `ON DELETE RESTRICT` on `video.folder_id` |
-| Removing a video removes its timestamps, sessions and notes. | `ON DELETE CASCADE` |
-| A note's session must belong to the same video as the note. | Composite FK `(session_id, video_id)` |
-| A session never exists without notes: deleting its last note deletes it. | Application rule / trigger |
-| A session has at most one summary; summarizing again replaces it. | `UNIQUE (session_id)` |
-| A summary goes with its session and its video. | `ON DELETE CASCADE` on both |
+| Removing a video removes its timestamps, notes and summary. | `ON DELETE CASCADE` |
+| A video has at most one summary; summarizing again replaces it. | `UNIQUE (video_id)` |
+| Only a video with notes can be summarized, and deleting its last note deletes the summary. | Application rule / trigger |
 | Only a pending summary accepts text, once. | Application rule (`status` transition) |
 | Cancelling a regeneration restores the previous text. | Application rule |
 | The player's character must be in the roster. | `FOREIGN KEY (player_character_id)` |
 | New characters in the roster get a matchup folder on next launch. | Seed migration |
 
-`Note.videoId` is deliberately redundant with `Note.sessionId -> ReviewSession.videoId`.
-Notes are read per video far more often than per session, and the duplication keeps that
-read a single filter (and, later, a single indexed lookup) instead of a join.
-`SessionSummary.videoId` is redundant in the same way and for the same reason.
+There are no review sessions: notes used to be grouped by the sitting they were written
+in, and that was removed ([ADR 0013](decisions/0013-notes-per-video.md)).
 
-The Session notes view groups summaries by character. That grouping is derived, not
-stored: summary -> session -> video -> folder -> character, with videos in custom
-folders falling under "Miscellaneous".
+Two things the UI shows are derived, not stored:
+
+- The Review notes view groups videos by character: video -> folder -> character, with
+  videos in custom folders falling under "Miscellaneous".
+- "N notes not in the summary yet" is the number of notes whose `updatedAt` is later than
+  the summary's `requestedAt`.
 
 ## Example file
 
 ```json
 {
-  "schemaVersion": 3,
+  "schemaVersion": 4,
   "settings": {
     "theme": "dark",
     "videosRoot": null,
@@ -195,14 +183,11 @@ folders falling under "Miscellaneous".
   "timestamps": [
     { "id": "c9b2...", "videoId": "a41e...", "timeSeconds": 183.4, "label": "Round 2 - lost neutral", "kind": "focus", "createdAt": "2026-11-14T09:06:00.000Z" }
   ],
-  "sessions": [
-    { "id": "77d0...", "videoId": "a41e...", "startedAt": "2026-11-14T09:10:00.000Z", "lastActivityAt": "2026-11-14T09:25:00.000Z" }
-  ],
   "notes": [
-    { "id": "e3aa...", "videoId": "a41e...", "sessionId": "77d0...", "timeSeconds": 191.75, "body": "Dropped the combo after 6P - practise the route", "createdAt": "2026-11-14T09:12:00.000Z", "updatedAt": "2026-11-14T09:12:00.000Z" }
+    { "id": "e3aa...", "videoId": "a41e...", "timeSeconds": 191.75, "body": "Dropped the combo after 6P - practise the route", "createdAt": "2026-11-14T09:12:00.000Z", "updatedAt": "2026-11-14T09:12:00.000Z" }
   ],
   "summaries": [
-    { "id": "19c4...", "sessionId": "77d0...", "videoId": "a41e...", "status": "ready", "markdown": "## Overview\n\nYou lost most rounds to...", "model": "claude-haiku-4.5", "requestedAt": "2026-11-14T09:26:00.000Z", "completedAt": "2026-11-14T09:26:40.000Z" }
+    { "id": "19c4...", "videoId": "a41e...", "status": "ready", "markdown": "## Overview\n\nYou lost most rounds to...", "model": "claude-haiku-4.5", "requestedAt": "2026-11-14T09:26:00.000Z", "completedAt": "2026-11-14T09:26:40.000Z" }
   ]
 }
 ```
@@ -255,36 +240,25 @@ CREATE TABLE "timestamp" (
 );
 CREATE INDEX timestamp_video_time ON "timestamp" (video_id, time_seconds);
 
-CREATE TABLE review_session (
-  id               TEXT PRIMARY KEY,
-  video_id         TEXT NOT NULL REFERENCES video (id) ON DELETE CASCADE,
-  started_at       TIMESTAMPTZ NOT NULL,
-  last_activity_at TIMESTAMPTZ NOT NULL,
-  UNIQUE (id, video_id)
-);
 
 CREATE TABLE note (
   id           TEXT PRIMARY KEY,
   video_id     TEXT NOT NULL REFERENCES video (id) ON DELETE CASCADE,
-  session_id   TEXT NOT NULL,
   time_seconds DOUBLE PRECISION NOT NULL CHECK (time_seconds >= 0),
   body         TEXT NOT NULL,
   created_at   TIMESTAMPTZ NOT NULL,
-  updated_at   TIMESTAMPTZ NOT NULL,
-  FOREIGN KEY (session_id, video_id) REFERENCES review_session (id, video_id) ON DELETE CASCADE
+  updated_at   TIMESTAMPTZ NOT NULL
 );
 CREATE INDEX note_video_time ON note (video_id, time_seconds);
 
-CREATE TABLE session_summary (
+CREATE TABLE video_summary (
   id           TEXT PRIMARY KEY,
-  session_id   TEXT NOT NULL UNIQUE,
-  video_id     TEXT NOT NULL REFERENCES video (id) ON DELETE CASCADE,
+  video_id     TEXT NOT NULL UNIQUE REFERENCES video (id) ON DELETE CASCADE,
   status       TEXT NOT NULL CHECK (status IN ('pending', 'ready')),
   markdown     TEXT NOT NULL DEFAULT '',
   model        TEXT NOT NULL,
   requested_at TIMESTAMPTZ NOT NULL,
-  completed_at TIMESTAMPTZ,
-  FOREIGN KEY (session_id, video_id) REFERENCES review_session (id, video_id) ON DELETE CASCADE
+  completed_at TIMESTAMPTZ
 );
 
 CREATE TABLE settings (
@@ -321,12 +295,17 @@ What changes in the code when that day comes:
 
 `schemaVersion` is checked on load and the file is upgraded one version at a time by the
 steps in `MIGRATIONS` (`repository.ts`). A file written by a newer version of the app is
-refused rather than guessed at.
+refused rather than guessed at. Before an older file is upgraded it is copied, unchanged,
+to `library.v<old version>-backup.json` beside the library; an existing copy is never
+overwritten.
 
 | Version | Change |
 | --- | --- |
 | 1 | Initial schema. |
 | 2 | Added `summaries`, `settings.playerCharacterId` and `settings.summaryModel`. |
-| 3 | Added `settings.email`. | A file that cannot be parsed is **renamed**
+| 3 | Added `settings.email`. |
+| 4 | Removed `sessions` and `sessionId`: notes belong to their video, and a video has one summary. Where a video had several, the newest is kept. |
+
+A file that cannot be parsed is **renamed**
 (`library.unreadable-<timestamp>.json`), never overwritten, so a bad edit or a bug can
 not destroy notes.

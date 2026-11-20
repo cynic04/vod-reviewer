@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import type { SessionSummary } from '@shared/domain/schema';
+import type { VideoSummary } from '@shared/domain/schema';
 import { Button } from '@renderer/components/Button';
 import { useLibrary } from '@renderer/store/hooks';
 import { useLibraryStore } from '@renderer/store/libraryStore';
@@ -7,11 +7,11 @@ import { reportError, useToastStore } from '@renderer/store/toastStore';
 import { EmailSetupDialog } from './EmailSetupDialog';
 
 interface EmailSummaryButtonProps {
-  summary: SessionSummary;
+  summary: VideoSummary;
 }
 
 /**
- * Emails a finished summary - with the session's notes and its study videos - to the
+ * Emails a finished summary - with the video's notes and its study videos - to the
  * address from the email setup. Opens the setup first if no account is connected yet.
  */
 export function EmailSummaryButton({ summary }: EmailSummaryButtonProps) {
