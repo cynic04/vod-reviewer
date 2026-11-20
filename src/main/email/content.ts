@@ -5,7 +5,7 @@ import { formatDuration } from '@shared/domain/time';
 import { DomainError, notFound } from '../library/errors';
 
 /**
- * Builds the email that carries a session summary to the user's phone.
+ * Builds the email that carries a video's summary to the user's phone.
  *
  * HTML email is its own dialect: no stylesheets, no flexbox or grid, and each client
  * strips something different. So the layout is nested tables and every style is inline,
@@ -213,22 +213,23 @@ export function buildSummaryEmail(
   const summary = library.summaries.find((candidate) => candidate.id === summaryId);
   if (!summary) throw notFound('Summary', summaryId);
   if (summary.markdown === '') {
-    throw new DomainError('CONFLICT', 'This session has not been summarized yet.');
+    throw new DomainError('CONFLICT', 'This video has not been summarized yet.');
   }
 
-  const session = library.sessions.find((candidate) => candidate.id === summary.sessionId);
   const video = library.videos.find((candidate) => candidate.id === summary.videoId);
-  if (!session || !video) throw notFound('Review session', summary.sessionId);
+  if (!video) throw notFound('Video', summary.videoId);
 
   const folder = library.folders.find((candidate) => candidate.id === video.folderId);
   const opponent = getCharacter(folder?.characterId ?? null);
   const player = getCharacter(library.settings.playerCharacterId);
   const heading = opponent ? `vs. ${opponent.name}` : (folder?.name ?? 'Review');
   const notes = library.notes
-    .filter((note) => note.sessionId === session.id)
+    .filter((note) => note.videoId === video.id)
     .sort((a, b) => a.timeSeconds - b.timeSeconds);
   const videos = extractVideos(summary.markdown);
-  const reviewedOn = dateFormat.format(new Date(session.startedAt));
+  // The day of the last note: a video can be reviewed over several sittings.
+  const lastNoteAt = notes.reduce((latest, note) => (note.createdAt > latest ? note.createdAt : latest), '');
+  const reviewedOn = dateFormat.format(new Date(lastNoteAt === '' ? summary.requestedAt : lastNoteAt));
 
   const subject = `VOD review: ${heading} - ${video.title} (${reviewedOn})`;
   const preheader = `${notes.length === 1 ? '1 note' : `${notes.length} notes`} from your review of ${video.title}, with an action plan${videos.length > 0 ? ` and ${videos.length} videos to watch` : ''}.`;
@@ -259,7 +260,7 @@ export function buildSummaryEmail(
               <tr>
                 ${portraitCell}
                 <td valign="middle">
-                  <div style="margin:0 0 6px;font-family:${FONT.display};font-size:12px;font-style:italic;letter-spacing:2px;text-transform:uppercase;color:${COLOR.onInkMuted};">VOD<span style="color:${COLOR.red};">//</span>Reviewer &middot; Session notes</div>
+                  <div style="margin:0 0 6px;font-family:${FONT.display};font-size:12px;font-style:italic;letter-spacing:2px;text-transform:uppercase;color:${COLOR.onInkMuted};">VOD<span style="color:${COLOR.red};">//</span>Reviewer &middot; Review notes</div>
                   <div style="font-family:${FONT.display};font-size:30px;font-style:italic;line-height:1.05;letter-spacing:0.5px;text-transform:uppercase;color:${COLOR.onInk};">${escapeHtml(heading)}</div>
                   ${player && opponent ? `<div style="margin:6px 0 0;font-family:${FONT.body};font-size:13px;color:${COLOR.yellow};">Playing ${escapeHtml(player.name)}</div>` : ''}
                 </td>

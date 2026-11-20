@@ -91,57 +91,20 @@ describe('library operations', () => {
     expect(updated.videos[0]).toMatchObject({ title: 'set-vs-sol', durationSeconds: 90 });
   });
 
-  it('groups notes into a session and opens a new one on request', () => {
+  it('keeps every note on a video in one collection, whenever it was written', () => {
     const ctx = testContext();
     const { library, videoId } = libraryWithVideo(ctx);
 
-    const first = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'Whiffed 6P' }, ctx);
-    const second = createNote(
-      first.library,
-      { videoId, sessionId: first.note.sessionId, timeSeconds: 9, body: 'Burst baited' },
-      ctx,
-    );
-    const third = createNote(second.library, { videoId, sessionId: null, timeSeconds: 1, body: 'Later' }, ctx);
+    const first = createNote(library, { videoId, timeSeconds: 3, body: 'Whiffed 6P' }, ctx);
+    const second = createNote(first.library, { videoId, timeSeconds: 9, body: 'Burst baited' }, ctx);
 
-    expect(second.note.sessionId).toBe(first.note.sessionId);
-    expect(third.note.sessionId).not.toBe(first.note.sessionId);
-    expect(third.library.sessions).toHaveLength(2);
+    expect(second.library.notes).toMatchObject([
+      { videoId, timeSeconds: 3, body: 'Whiffed 6P' },
+      { videoId, timeSeconds: 9, body: 'Burst baited' },
+    ]);
+    expect(() => createNote(library, { videoId: 'missing', timeSeconds: 0, body: 'x' }, ctx)).toThrow(/does not exist/);
   });
-
-  it('rejects a note for a session that belongs to another video', () => {
-    const ctx = testContext();
-    const { library, videoId } = libraryWithVideo(ctx);
-    const other = importVideo(
-      library,
-      { filePath: 'C:\\b.mp4', fileName: 'b.mp4', fileSizeBytes: 1, recordedAt: ctx.now().toISOString(), folderId: SOL },
-      ctx,
-    );
-    const { library: withNote, note } = createNote(
-      other.library,
-      { videoId, sessionId: null, timeSeconds: 0, body: 'a' },
-      ctx,
-    );
-
-    expect(() =>
-      createNote(withNote, { videoId: other.video.id, sessionId: note.sessionId, timeSeconds: 0, body: 'b' }, ctx),
-    ).toThrow(/different video/);
-  });
-
-  it('drops a session when its last note is removed', () => {
-    const ctx = testContext();
-    const { library, videoId } = libraryWithVideo(ctx);
-    const { library: withNote, note } = createNote(
-      library,
-      { videoId, sessionId: null, timeSeconds: 3, body: 'Only note' },
-      ctx,
-    );
-
-    const cleared = removeNote(withNote, note.id);
-    expect(cleared.notes).toHaveLength(0);
-    expect(cleared.sessions).toHaveLength(0);
-  });
-
-  it('removes a video together with its timestamps, notes and sessions', () => {
+  it('removes a video together with its timestamps and notes', () => {
     const ctx = testContext();
     const { library, videoId } = libraryWithVideo(ctx);
     const withTimestamp = createTimestamp(
@@ -149,23 +112,23 @@ describe('library operations', () => {
       { videoId, timeSeconds: 12, label: 'Round 2', kind: 'focus' },
       ctx,
     ).library;
-    const withNote = createNote(withTimestamp, { videoId, sessionId: null, timeSeconds: 12, body: 'x' }, ctx);
+    const withNote = createNote(withTimestamp, { videoId, timeSeconds: 12, body: 'x' }, ctx);
 
     const removed = removeVideo(withNote.library, videoId);
-    expect(removed).toMatchObject({ videos: [], timestamps: [], notes: [], sessions: [] });
+    expect(removed).toMatchObject({ videos: [], timestamps: [], notes: [] });
   });
 
   it('keeps the previous summary text until a regenerated one arrives', () => {
     const ctx = testContext();
     const { library, videoId } = libraryWithVideo(ctx);
-    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
+    const { library: withNote } = createNote(library, { videoId, timeSeconds: 3, body: 'x' }, ctx);
 
-    const first = requestSummary(withNote, note.sessionId, ctx);
+    const first = requestSummary(withNote, videoId, ctx);
     expect(first.summary).toMatchObject({ status: 'pending', markdown: '', model: 'claude-haiku-4.5' });
     const written = completeSummary(first.library, first.summary.id, '  ## Overview  ', ctx);
     expect(written.summaries).toMatchObject([{ status: 'ready', markdown: '## Overview' }]);
 
-    const again = requestSummary(written, note.sessionId, ctx);
+    const again = requestSummary(written, videoId, ctx);
     expect(again.library.summaries).toHaveLength(1);
     expect(again.summary).toMatchObject({ status: 'pending', markdown: '## Overview' });
     expect(again.summary.id).not.toBe(first.summary.id);
@@ -180,25 +143,29 @@ describe('library operations', () => {
     expect(removeSummary(written, first.summary.id).summaries).toEqual([]);
   });
 
-  it('only summarizes sessions that exist, and only accepts a summary once', () => {
+  it('only summarizes videos that exist and have notes, and only accepts a summary once', () => {
     const ctx = testContext();
     const { library, videoId } = libraryWithVideo(ctx);
-    expect(() => requestSummary(library, 'no-session', ctx)).toThrow(/does not exist/);
+    expect(() => requestSummary(library, 'no-video', ctx)).toThrow(/does not exist/);
+    expect(() => requestSummary(library, videoId, ctx)).toThrow(/no notes/);
 
-    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
-    const { library: pending, summary } = requestSummary(withNote, note.sessionId, ctx);
+    const { library: withNote } = createNote(library, { videoId, timeSeconds: 3, body: 'x' }, ctx);
+    const { library: pending, summary } = requestSummary(withNote, videoId, ctx);
     expect(() => completeSummary(pending, summary.id, '   ', ctx)).toThrow(/empty/);
     const done = completeSummary(pending, summary.id, 'text', ctx);
     expect(() => completeSummary(done, summary.id, 'again', ctx)).toThrow(/already been saved/);
   });
 
-  it('drops a summary with its session or its video', () => {
+  it('drops a summary with the last note of its video, or with the video', () => {
     const ctx = testContext();
     const { library, videoId } = libraryWithVideo(ctx);
-    const { library: withNote, note } = createNote(library, { videoId, sessionId: null, timeSeconds: 3, body: 'x' }, ctx);
-    const { library: summarized } = requestSummary(withNote, note.sessionId, ctx);
+    const { library: withNote, note } = createNote(library, { videoId, timeSeconds: 3, body: 'x' }, ctx);
+    const two = createNote(withNote, { videoId, timeSeconds: 8, body: 'y' }, ctx);
+    const { library: summarized } = requestSummary(two.library, videoId, ctx);
 
-    expect(removeNote(summarized, note.id).summaries).toEqual([]);
+    const oneLeft = removeNote(summarized, note.id);
+    expect(oneLeft.summaries).toHaveLength(1);
+    expect(removeNote(oneLeft, two.note.id).summaries).toEqual([]);
     expect(removeVideo(summarized, videoId).summaries).toEqual([]);
   });
 

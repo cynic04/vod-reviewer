@@ -4,10 +4,10 @@ import { formatDuration } from '@shared/domain/time';
 import { notFound } from '../library/errors';
 
 /**
- * Everything the summarize agent is told about one review session. Built fresh from the
+ * Everything the summarize agent is told about one video and the notes taken on it. Built fresh from the
  * library each time the agent asks, so it always reflects the notes as they are now.
  */
-export interface SessionBrief {
+export interface ReviewBrief {
   game: string;
   matchup: {
     /** The character the user plays, or `null` if they have not set one. */
@@ -22,9 +22,7 @@ export interface SessionBrief {
     recordedOn: string;
     length: string | null;
   };
-  session: {
-    startedAt: string;
-  };
+  /** Every note on the video, in video order, whenever it was written. */
   notes: { time: string; text: string }[];
   /** Moments the player flagged: focus points set before reviewing, bookmarks set during. */
   markers: { time: string; kind: 'focus' | 'bookmark'; label: string }[];
@@ -32,13 +30,12 @@ export interface SessionBrief {
 
 const byTime = (a: { timeSeconds: number }, b: { timeSeconds: number }): number => a.timeSeconds - b.timeSeconds;
 
-export function buildSessionBrief(library: Library, summaryId: string): SessionBrief {
+export function buildReviewBrief(library: Library, summaryId: string): ReviewBrief {
   const summary = library.summaries.find((candidate) => candidate.id === summaryId);
   if (!summary) throw notFound('Summary', summaryId);
 
-  const session = library.sessions.find((candidate) => candidate.id === summary.sessionId);
   const video = library.videos.find((candidate) => candidate.id === summary.videoId);
-  if (!session || !video) throw notFound('Review session', summary.sessionId);
+  if (!video) throw notFound('Video', summary.videoId);
 
   const folder = library.folders.find((candidate) => candidate.id === video.folderId);
   const opponent = getCharacter(folder?.characterId ?? null);
@@ -55,9 +52,8 @@ export function buildSessionBrief(library: Library, summaryId: string): SessionB
       recordedOn: video.recordedAt.slice(0, 10),
       length: video.durationSeconds === null ? null : formatDuration(video.durationSeconds),
     },
-    session: { startedAt: session.startedAt },
     notes: library.notes
-      .filter((note) => note.sessionId === session.id)
+      .filter((note) => note.videoId === video.id)
       .sort(byTime)
       .map((note) => ({ time: formatDuration(note.timeSeconds), text: note.body })),
     markers: library.timestamps

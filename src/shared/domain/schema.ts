@@ -83,17 +83,9 @@ export const timestampSchema = z.object({
   createdAt: isoDateSchema,
 });
 
-export const reviewSessionSchema = z.object({
-  id: idSchema,
-  videoId: idSchema,
-  startedAt: isoDateSchema,
-  lastActivityAt: isoDateSchema,
-});
-
 export const noteSchema = z.object({
   id: idSchema,
   videoId: idSchema,
-  sessionId: idSchema,
   timeSeconds: timeSecondsSchema,
   body: z.string().trim().min(1).max(5000),
   createdAt: isoDateSchema,
@@ -102,10 +94,9 @@ export const noteSchema = z.object({
 
 export const summaryStatusSchema = z.enum(['pending', 'ready']);
 
-/** The AI-written coaching summary of one review session. At most one per session. */
-export const sessionSummarySchema = z.object({
+/** The AI-written coaching summary of all the notes on one video. At most one per video. */
+export const videoSummarySchema = z.object({
   id: idSchema,
-  sessionId: idSchema,
   videoId: idSchema,
   /** `pending` while the agent is working. A pending summary may still show the previous text. */
   status: summaryStatusSchema,
@@ -122,9 +113,8 @@ export const librarySchema = z.object({
   folders: z.array(folderSchema),
   videos: z.array(videoSchema),
   timestamps: z.array(timestampSchema),
-  sessions: z.array(reviewSessionSchema),
   notes: z.array(noteSchema),
-  summaries: z.array(sessionSummarySchema),
+  summaries: z.array(videoSummarySchema),
 });
 
 export type ThemePreference = z.infer<typeof themePreferenceSchema>;
@@ -136,8 +126,7 @@ export type FrameRateSource = z.infer<typeof frameRateSourceSchema>;
 export type Video = z.infer<typeof videoSchema>;
 export type TimestampKind = z.infer<typeof timestampKindSchema>;
 export type Timestamp = z.infer<typeof timestampSchema>;
-export type ReviewSession = z.infer<typeof reviewSessionSchema>;
 export type Note = z.infer<typeof noteSchema>;
 export type SummaryStatus = z.infer<typeof summaryStatusSchema>;
-export type SessionSummary = z.infer<typeof sessionSummarySchema>;
+export type VideoSummary = z.infer<typeof videoSummarySchema>;
 export type Library = z.infer<typeof librarySchema>;

@@ -112,7 +112,7 @@ export function createIpcHandlers(deps: IpcHandlerDependencies): IpcHandlers {
 
     'notes:remove': ({ id }) => library.update((current) => operations.removeNote(current, id)),
 
-    'summaries:request': ({ sessionId }) => deps.agent.requestSummary(sessionId),
+    'summaries:request': ({ videoId }) => deps.agent.requestSummary(videoId),
 
     'summaries:remove': ({ id }) => deps.agent.removeSummary(id),
 

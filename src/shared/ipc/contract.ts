@@ -9,7 +9,7 @@ import {
   videoSchema,
   type Library,
   type Note,
-  type SessionSummary,
+  type VideoSummary,
   type Timestamp,
   type Video,
 } from '../domain/schema';
@@ -60,15 +60,12 @@ export const ipcRequestSchemas = {
   }),
   'timestamps:remove': z.object({ id }),
 
-  'notes:create': noteSchema.pick({ videoId: true, timeSeconds: true, body: true }).extend({
-    /** `null` starts a new review session for the note. */
-    sessionId: id.nullable(),
-  }),
+  'notes:create': noteSchema.pick({ videoId: true, timeSeconds: true, body: true }),
   'notes:update': noteSchema.pick({ id: true, body: true }),
   'notes:remove': z.object({ id }),
 
-  /** Starts the summarize agent for a review session, in a new terminal window. */
-  'summaries:request': z.object({ sessionId: id }),
+  /** Starts the summarize agent on all the notes of a video, in a new terminal window. */
+  'summaries:request': z.object({ videoId: id }),
   'summaries:remove': z.object({ id }),
 
   /**
@@ -130,7 +127,7 @@ interface IpcResponses {
   'notes:create': { library: Library; note: Note };
   'notes:update': Library;
   'notes:remove': Library;
-  'summaries:request': { library: Library; summary: SessionSummary };
+  'summaries:request': { library: Library; summary: VideoSummary };
   'summaries:remove': Library;
   'email:configure': Library;
   'email:remove': Library;

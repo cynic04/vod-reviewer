@@ -10,11 +10,10 @@ import type {
   Folder,
   Library,
   Note,
-  ReviewSession,
-  SessionSummary,
   Settings,
   Timestamp,
   Video,
+  VideoSummary,
 } from '@shared/domain/schema';
 import type { IpcRequest } from '@shared/ipc/contract';
 import { pathKey } from '../videos/paths';
@@ -70,7 +69,6 @@ export function createEmptyLibrary(ctx: OperationContext): Library {
     folders: CHARACTERS.map((character) => matchupFolder(character.id, character.name, createdAt)),
     videos: [],
     timestamps: [],
-    sessions: [],
     notes: [],
     summaries: [],
   };
@@ -149,7 +147,6 @@ export function removeVideo(library: Library, id: string): Library {
     ...library,
     videos: library.videos.filter((video) => video.id !== id),
     timestamps: library.timestamps.filter((timestamp) => timestamp.videoId !== id),
-    sessions: library.sessions.filter((session) => session.videoId !== id),
     notes: library.notes.filter((note) => note.videoId !== id),
     summaries: library.summaries.filter((summary) => summary.videoId !== id),
   };
@@ -216,10 +213,7 @@ export function removeTimestamp(library: Library, id: string): Library {
   return { ...library, timestamps: library.timestamps.filter((timestamp) => timestamp.id !== id) };
 }
 
-/**
- * Stores a note. Notes always belong to a review session: passing `sessionId: null`
- * opens a new one, so sessions only exist once something was actually written in them.
- */
+/** Stores a note against a video. All of a video's notes form one collection. */
 export function createNote(
   library: Library,
   input: IpcRequest<'notes:create'>,
@@ -227,31 +221,15 @@ export function createNote(
 ): { library: Library; note: Note } {
   requireById(library.videos, input.videoId, 'Video');
   const now = ctx.now().toISOString();
-
-  let session: ReviewSession;
-  let sessions: ReviewSession[];
-  if (input.sessionId === null) {
-    session = { id: ctx.newId(), videoId: input.videoId, startedAt: now, lastActivityAt: now };
-    sessions = [...library.sessions, session];
-  } else {
-    const existing = requireById(library.sessions, input.sessionId, 'Review session');
-    if (existing.videoId !== input.videoId) {
-      throw new DomainError('CONFLICT', 'That review session belongs to a different video.');
-    }
-    session = { ...existing, lastActivityAt: now };
-    sessions = replaceById(library.sessions, session);
-  }
-
   const note: Note = {
     id: ctx.newId(),
     videoId: input.videoId,
-    sessionId: session.id,
     timeSeconds: input.timeSeconds,
     body: input.body,
     createdAt: now,
     updatedAt: now,
   };
-  return { library: { ...library, sessions, notes: [...library.notes, note] }, note };
+  return { library: { ...library, notes: [...library.notes, note] }, note };
 }
 
 export function updateNote(library: Library, id: string, body: string, ctx: OperationContext): Library {
@@ -260,39 +238,37 @@ export function updateNote(library: Library, id: string, body: string, ctx: Oper
   return { ...library, notes: replaceById(library.notes, updated) };
 }
 
-/** Removes a note, and its session (with any summary of it) once that session has no notes left. */
+/** Removes a note, and the video's summary once there are no notes left for it to be a summary of. */
 export function removeNote(library: Library, id: string): Library {
   const note = requireById(library.notes, id, 'Note');
   const notes = library.notes.filter((candidate) => candidate.id !== id);
-  if (notes.some((candidate) => candidate.sessionId === note.sessionId)) return { ...library, notes };
+  if (notes.some((candidate) => candidate.videoId === note.videoId)) return { ...library, notes };
   return {
     ...library,
     notes,
-    sessions: library.sessions.filter((session) => session.id !== note.sessionId),
-    summaries: library.summaries.filter((summary) => summary.sessionId !== note.sessionId),
+    summaries: library.summaries.filter((summary) => summary.videoId !== note.videoId),
   };
 }
 
 /**
- * Opens a summary request for a session. A session has at most one summary: asking again
- * replaces it with a new pending one that keeps showing the previous text until the
- * agent hands in a new version.
+ * Opens a request to summarize all the notes on a video. A video has at most one summary:
+ * asking again replaces it with a new pending one that keeps showing the previous text
+ * until the agent hands in a new version.
  */
 export function requestSummary(
   library: Library,
-  sessionId: string,
+  videoId: string,
   ctx: OperationContext,
-): { library: Library; summary: SessionSummary } {
-  const session = requireById(library.sessions, sessionId, 'Review session');
-  if (!library.notes.some((note) => note.sessionId === sessionId)) {
-    throw new DomainError('CONFLICT', 'There are no notes in this session to summarize yet.');
+): { library: Library; summary: VideoSummary } {
+  requireById(library.videos, videoId, 'Video');
+  if (!library.notes.some((note) => note.videoId === videoId)) {
+    throw new DomainError('CONFLICT', 'There are no notes on this video to summarize yet.');
   }
 
-  const previous = library.summaries.find((candidate) => candidate.sessionId === sessionId);
-  const summary: SessionSummary = {
+  const previous = library.summaries.find((candidate) => candidate.videoId === videoId);
+  const summary: VideoSummary = {
     id: ctx.newId(),
-    sessionId,
-    videoId: session.videoId,
+    videoId,
     status: 'pending',
     markdown: previous?.markdown ?? '',
     model: library.settings.summaryModel,
@@ -302,7 +278,7 @@ export function requestSummary(
   return {
     library: {
       ...library,
-      summaries: [...library.summaries.filter((candidate) => candidate.sessionId !== sessionId), summary],
+      summaries: [...library.summaries.filter((candidate) => candidate.videoId !== videoId), summary],
     },
     summary,
   };
@@ -319,7 +295,7 @@ export function completeSummary(library: Library, id: string, markdown: string, 
   if (text.length > MAX_SUMMARY_LENGTH) {
     throw new DomainError('INVALID_REQUEST', `The summary is longer than ${MAX_SUMMARY_LENGTH} characters.`);
   }
-  const completed: SessionSummary = {
+  const completed: VideoSummary = {
     ...summary,
     status: 'ready',
     markdown: text,
@@ -329,7 +305,7 @@ export function completeSummary(library: Library, id: string, markdown: string, 
 }
 
 /** What is left of a pending summary whose run will not finish: its previous text, if it had any. */
-function withoutPendingRun(summary: SessionSummary): SessionSummary[] {
+function withoutPendingRun(summary: VideoSummary): VideoSummary[] {
   if (summary.status !== 'pending') return [summary];
   return summary.markdown === '' ? [] : [{ ...summary, status: 'ready' }];
 }

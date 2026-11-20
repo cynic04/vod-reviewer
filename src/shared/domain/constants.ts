@@ -3,7 +3,7 @@
  * needs a number does not pull the validation library into its bundle.
  */
 
-export const LIBRARY_SCHEMA_VERSION = 3;
+export const LIBRARY_SCHEMA_VERSION = 4;
 
 /** Fighting games run at 60fps, so that is assumed until a video's real rate is detected. */
 export const DEFAULT_FRAME_RATE = 60;

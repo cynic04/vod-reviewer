@@ -15,7 +15,7 @@ import {
 } from '../library/operations';
 import type { LibraryRepository } from '../library/repository';
 import { LibraryService } from '../library/service';
-import type { SessionBrief } from './brief';
+import type { ReviewBrief } from './brief';
 import { AGENT_AVAILABLE_TOOLS, buildCopilotArguments, buildLauncherScript, buildMcpConfig } from './launcher';
 import { createMcpRequestListener, handleMcpMessage, type JsonRpcResponse, type McpTool } from './mcp';
 import { createAgentTools } from './tools';
@@ -28,7 +28,7 @@ function testContext(): OperationContext {
   return { now: () => new Date('2026-11-14T10:00:00.000Z'), newId: () => `id-${(counter += 1)}` };
 }
 
-/** A library with one video vs. Sol, one session with two notes, and a pending summary. */
+/** A library with one video vs. Sol, two notes, and a pending summary. */
 async function agentFixture(): Promise<{
   service: LibraryService;
   summaryId: string;
@@ -51,13 +51,13 @@ async function agentFixture(): Promise<{
   );
   const videoId = imported.video.id;
   library = createTimestamp(imported.library, { videoId, timeSeconds: 125, label: 'Round 2', kind: 'focus' }, ctx).library;
-  const first = createNote(library, { videoId, sessionId: null, timeSeconds: 125, body: 'Never anti-aired' }, ctx);
+  const first = createNote(library, { videoId, timeSeconds: 125, body: 'Never anti-aired' }, ctx);
   const second = createNote(
     first.library,
-    { videoId, sessionId: first.note.sessionId, timeSeconds: 14, body: 'Jumped in, got 6P again' },
+    { videoId, timeSeconds: 14, body: 'Jumped in, got 6P again' },
     ctx,
   );
-  const requested = requestSummary(second.library, first.note.sessionId, ctx);
+  const requested = requestSummary(second.library, videoId, ctx);
 
   const repository: LibraryRepository = {
     load: () => Promise.resolve(requested.library),
@@ -66,7 +66,7 @@ async function agentFixture(): Promise<{
   const service = await LibraryService.open(repository, ctx);
   // Opening settles pending summaries from a previous launch; ask again as the running app would.
   const summary = await service.mutate((current) => {
-    const next = requestSummary(current, first.note.sessionId, ctx);
+    const next = requestSummary(current, videoId, ctx);
     return { library: next.library, result: next.summary };
   });
 
@@ -146,7 +146,7 @@ describe('MCP protocol', () => {
     const listed = await handleMcpMessage({ jsonrpc: '2.0', id: 1, method: 'tools/list' }, tools, SERVER_INFO);
     const advertised = (listed?.result as { tools: { name: string; inputSchema: { type: string } }[] }).tools;
     expect(advertised.map((tool) => tool.name)).toEqual([
-      'get_review_session',
+      'get_review_notes',
       'frame_data',
       'youtube_search',
       'save_summary',
@@ -160,9 +160,9 @@ describe('MCP protocol', () => {
 });
 
 describe('agent tools', () => {
-  it('briefs the agent on exactly one session', async () => {
+  it('briefs the agent on exactly one video and all its notes', async () => {
     const { tools } = await agentFixture();
-    const brief = JSON.parse(textOf(await call(tools, 'get_review_session')).text) as SessionBrief;
+    const brief = JSON.parse(textOf(await call(tools, 'get_review_notes')).text) as ReviewBrief;
 
     expect(brief.matchup).toEqual({ player: 'Millia Rage', opponent: 'Sol Badguy', folder: null });
     expect(brief.notes).toEqual([
@@ -288,7 +288,7 @@ describe('launcher', () => {
     expect(AGENT_AVAILABLE_TOOLS).toEqual([
       'skill',
       'web_fetch',
-      'vod-reviewer-get_review_session',
+      'vod-reviewer-get_review_notes',
       'vod-reviewer-frame_data',
       'vod-reviewer-youtube_search',
       'vod-reviewer-save_summary',
