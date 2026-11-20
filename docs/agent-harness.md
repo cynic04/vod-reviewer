@@ -1,6 +1,6 @@
 # The agent harness
 
-Pressing **Summarize** in the notes panel turns the notes of a review session into a
+Pressing **Summarize** in the notes panel turns all the notes on a video into a
 coaching summary: recurring patterns, what went well, an action plan, and links to recent
 high-level footage of the matchup and to guides for the skills that need work.
 
@@ -18,11 +18,11 @@ sequenceDiagram
     participant Web as YouTube / Dustloop
 
     Player->>UI: Summarize
-    UI->>Main: summaries:request { sessionId }
+    UI->>Main: summaries:request { videoId }
     Main->>Main: create pending summary<br/>write skill, MCP config, launcher script
     Main->>CLI: open terminal: copilot --prompt /summarize --model <small> ...
     Main-->>UI: library (summary pending)
-    CLI->>Main: MCP get_review_session
+    CLI->>Main: MCP get_review_notes
     Main-->>CLI: matchup, video, notes, markers
     CLI->>Main: MCP frame_data (moves named in the notes)
     Main->>Web: Dustloop API (unless cached)
@@ -34,7 +34,7 @@ sequenceDiagram
     CLI->>Main: MCP save_summary { markdown }
     Main->>Main: store summary, mark ready
     Main-->>UI: push: library changed
-    UI-->>Player: summary under Session notes
+    UI-->>Player: summary under Review notes
 ```
 
 ## The pieces
@@ -43,18 +43,18 @@ sequenceDiagram
 | --- | --- | --- |
 | The skill | [`resources/agent/skills/summarize/SKILL.md`](../resources/agent/skills/summarize/SKILL.md) | The agent's instructions: how to read the notes, what to research, the exact shape of the summary. This is the file to edit to change what summaries say. |
 | The harness | [`src/main/agent/harness.ts`](../src/main/agent/harness.ts) | Starts runs and hosts the endpoint the agent talks to. |
-| The tools | [`src/main/agent/tools.ts`](../src/main/agent/tools.ts) | `get_review_session`, `frame_data`, `youtube_search`, `save_summary`. |
+| The tools | [`src/main/agent/tools.ts`](../src/main/agent/tools.ts) | `get_review_notes`, `frame_data`, `youtube_search`, `save_summary`. |
 | Frame data | [`src/main/framedata`](../src/main/framedata) | Dustloop lookup, local cache, and the punish calculation the tool prints. |
 | The protocol | [`src/main/agent/mcp.ts`](../src/main/agent/mcp.ts) | A minimal Model Context Protocol server over loopback HTTP. |
 | The launcher | [`src/main/agent/launcher.ts`](../src/main/agent/launcher.ts) | Builds the `copilot` command line and the batch file that runs it. |
 | YouTube search | [`src/main/agent/youtube.ts`](../src/main/agent/youtube.ts) | Search without an API key, reduced to a few lines per query. |
-| The brief | [`src/main/agent/brief.ts`](../src/main/agent/brief.ts) | What the agent is told about a session. |
+| The brief | [`src/main/agent/brief.ts`](../src/main/agent/brief.ts) | What the agent is told about a video and its notes. |
 
 ## What happens on "Summarize"
 
 1. The app checks that the Copilot CLI is installed (`copilot` on the `PATH`).
-2. It creates a **pending** summary for the session in the library. A session has at most
-   one summary; summarizing again keeps showing the old text until the new one arrives.
+2. It creates a **pending** summary for the video in the library. A video has at most
+   one summary, of all its notes; summarizing again keeps showing the old text until the new one arrives.
 3. In its workspace, `%APPDATA%\vod-reviewer\agent\`, it writes:
    - `.github/skills/summarize/SKILL.md` - the skill, refreshed on every run so that an
      app update also updates it;
@@ -68,16 +68,16 @@ sequenceDiagram
            --additional-mcp-config @runs/<summaryId>.mcp.json
            --allow-tool vod-reviewer --allow-all-urls
            --available-tools skill web_fetch
-                             vod-reviewer-get_review_session
+                             vod-reviewer-get_review_notes
                              vod-reviewer-frame_data
                              vod-reviewer-youtube_search
                              vod-reviewer-save_summary
    ```
 
-5. The agent follows the skill: reads the session, looks up frame data for the moves in
+5. The agent follows the skill: reads the notes, looks up frame data for the moves in
    the notes, researches, and calls `save_summary`.
 6. The app stores the markdown, marks the summary ready and pushes the new library to the
-   window, where it appears under **Session notes** without a refresh.
+   window, where it appears under **Review notes** without a refresh.
 
 7. If email is set up with automatic sending on, the app emails the summary at this point
    and reports the outcome in the window. See [ADR 0011](decisions/0011-email-summaries.md).
@@ -88,7 +88,7 @@ The terminal stays open afterwards so the run can be read; closing it is safe at
 
 | Tool | Arguments | Returns |
 | --- | --- | --- |
-| `get_review_session` | none | JSON: the matchup (your character and the opponent's), the video, the session's notes with their times, and the moments you flagged. |
+| `get_review_notes` | none | JSON: the matchup (your character and the opponent's), the video, every note on it with its time, and the moments you flagged. |
 | `frame_data` | `character` (`opponent` or `player`), optional `moves` | Frame data from Dustloop for that side of the matchup, one move per line. For the opponent's moves, each line is followed by which of the player's moves punish it on block. |
 | `youtube_search` | `query`, `period` (`month`, `year` or `any`) | Up to six videos, one per line: title, channel, age, length, views, URL. At most eight searches per run. |
 | `save_summary` | `markdown` | Stores the summary. Works once per run. |
@@ -99,7 +99,7 @@ whose address it knows - in practice the Dustloop wiki).
 ## Why it is built this way
 
 **The agent never touches the library file.** It reaches the app through four narrow
-tools bound to *one* summary and its matchup. It cannot name another session, read other notes, or write
+tools bound to *one* summary and its matchup. It cannot name another video, read other notes, or write
 anything except that summary's text. Each run has its own endpoint URL containing a
 random id; the server listens on `127.0.0.1` only and refuses requests that carry a
 browser `Origin`.

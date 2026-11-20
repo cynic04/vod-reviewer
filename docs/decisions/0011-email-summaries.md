@@ -10,7 +10,7 @@ formatted, so that the notes and the videos it recommends can be opened on a pho
 
 - **Send directly over SMTP** (nodemailer) from an account the user connects once in
   Settings: recipient, sending address, provider, password. For Gmail that means an *app
-  password*. Sending is one click on a session card, or automatic when a summary is
+  password*. Sending is one click on a video's card under Review notes, or automatic when a summary is
   written (a setting, on by default).
 - **The password never enters `library.json`.** It is encrypted with the operating
   system's key store through Electron's `safeStorage` (DPAPI on Windows) and kept in its
@@ -26,7 +26,7 @@ formatted, so that the notes and the videos it recommends can be opened on a pho
     that writes inline-styled tags;
   - a "Watch on your phone" block: every YouTube link in the summary as a tappable card
     with its thumbnail;
-  - the session's raw notes with their times;
+  - the video's raw notes with their times;
   - a plain-text alternative.
 - **The summary is treated as untrusted** here too: raw HTML in it is escaped and links
   that are not `http(s)` lose their target.

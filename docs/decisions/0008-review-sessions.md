@@ -1,5 +1,8 @@
 # 0008 - Group notes into implicit review sessions
 
+> **Superseded by [0013](0013-notes-per-video.md).** Sessions were removed: notes now
+> belong to their video only. Kept as a record of the original design.
+
 ## Context
 
 The brief asks to "store the notes taken in the session along with the video". Reviewing

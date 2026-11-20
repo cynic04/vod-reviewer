@@ -1,5 +1,9 @@
 # 0010 - Summarize sessions with the Copilot CLI behind an app-hosted MCP endpoint
 
+> **Later change:** summaries are now per video, not per session, the entity is
+> `VideoSummary`, the read tool is `get_review_notes` and the view is called Review notes.
+> See [0013](0013-notes-per-video.md). The harness itself is unchanged.
+
 ## Context
 
 Review notes are raw observations. The valuable step - spotting what repeats, deciding
